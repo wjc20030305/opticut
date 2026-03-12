@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RCOS | 智能钢筋下料</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        /* 苹果系统级字体与抗锯齿渲染 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #F5F5F7; 
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color: #1D1D1F;
+        }
+        
+        /* 优雅的 macOS 风格滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+
+        /* 极柔和的阴影 */
+        .apple-shadow { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04); }
+        
+        /* 毛玻璃效果 */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* 输入框去边框化设计 */
+        .apple-input {
+            background-color: #F2F2F7;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .apple-input:focus {
+            background-color: #FFFFFF;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+            outline: none;
+        }
+
+        .apple-btn:active { transform: scale(0.97); }
+        
+        /* 列表卡片激活态 */
+        .list-card-active {
+            border-color: #007AFF !important;
+            background-color: #F0F7FF !important;
+            box-shadow: 0 8px 24px rgba(0, 122, 255, 0.12) !important;
+            transform: scale(1.01);
+            z-index: 10;
+        }
+
+        .scroll-list-padding { padding-bottom: 24px; }
+        
+        /* Toast 动画样式 */
+        .toast-enter { transform: translateY(-20px); opacity: 0; }
+        .toast-active { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <header class="glass-header px-6 py-4 flex justify-between items-center shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-[#007AFF] p-1.5 rounded-lg text-white shadow-sm">
+                <i data-feather="layers" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="text-[17px] font-semibold tracking-tight text-[#1D1D1F]">RCOS 智能决策工作台</h1>
+                <p class="text-[11px] font-medium text-[#86868B] tracking-wide uppercase mt-0.5">Multi-stock 1D-CSP Optimizer</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex overflow-hidden">
+        
+        <aside class="w-[400px] bg-[#F5F5F7] flex flex-col shrink-0 overflow-y-auto z-10 p-5 gap-5 border-r border-[rgba(0,0,0,0.05)]">
+            
+            <section class="bg-white rounded-[20px] p-5 apple-shadow">
+                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+                    <i data-feather="settings" class="w-4 h-4 text-[#86868B]"></i> 工艺约束
+                </h2>
+                <div class="flex items-center justify-between">
+                    <label class="text-[14px] text-[#515154]">锯片切缝损耗 Δ</label>
+                    <div class="flex items-center gap-2">
+                        <input id="kerf" type="number" min="0" value="5" class="apple-input w-20 text-center rounded-xl p-2 text-[15px] font-medium text-[#1D1D1F]">
+                        <span class="text-[13px] text-[#86868B]">mm</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-[20px] p-5 apple-shadow flex flex-col max-h-[300px]">
+                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+                    <i data-feather="package" class="w-4 h-4 text-[#34C759]"></i> 仓库可用原材
+                </h2>
+                <div class="flex gap-2 mb-4">
+                    <input id="newStockLen" type="number" min="1" placeholder="长度 (mm)" class="apple-input w-[40%] rounded-xl p-2.5 text-[14px]">
+                    <input id="newStockInv" type="number" min="1" placeholder="库存量" class="apple-input w-[35%] rounded-xl p-2.5 text-[14px]">
+                    <button onclick="addStock()" class="w-[25%] bg-[#34C759] text-white rounded-xl text-[14px] font-medium hover:bg-[#32B353] transition-colors apple-btn">录入</button>
+                </div>
+                <div class="flex-grow overflow-hidden flex flex-col">
+                    <div class="text-[12px] font-medium text-[#86868B] grid grid-cols-3 pb-2 text-center border-b border-gray-100">
+                        <div>规格(mm)</div><div>库存(根)</div><div>操作</div>
+                    </div>
+                    <div id="stockBody" class="overflow-y-auto text-[14px] pt-1"></div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-[20px] p-5 apple-shadow flex-grow flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-[15px] font-semibold text-[#1D1D1F] flex items-center gap-2">
+                        <i data-feather="list" class="w-4 h-4 text-[#007AFF]"></i> 目标需求定尺
+                    </h2>
+                    <label class="cursor-pointer text-[13px] text-[#007AFF] hover:text-[#005bb5] font-medium transition-colors">
+                        导入 Excel
+                        <input type="file" id="excelFile" class="hidden" accept=".xlsx, .xls, .csv" onchange="importExcel()">
+                    </label>
+                </div>
+                <div class="flex gap-2 mb-4">
+                    <input id="newLen" type="number" min="1" placeholder="规格 (mm)" class="apple-input w-[40%] rounded-xl p-2.5 text-[14px]">
+                    <input id="newDem" type="number" min="1" placeholder="需求量" class="apple-input w-[35%] rounded-xl p-2.5 text-[14px]">
+                    <button onclick="addRow()" class="w-[25%] bg-[#007AFF] text-white rounded-xl text-[14px] font-medium hover:bg-[#0062cc] transition-colors apple-btn">加单</button>
+                </div>
+                <div class="flex-grow overflow-hidden flex flex-col">
+                    <div class="text-[12px] font-medium text-[#86868B] grid grid-cols-3 pb-2 text-center border-b border-gray-100">
+                        <div>定尺(mm)</div><div>需求(根)</div><div>操作</div>
+                    </div>
+                    <div id="demandBody" class="overflow-y-auto text-[14px] pt-1 min-h-[100px]"></div>
+                </div>
+            </section>
+
+            <button onclick="runOptimization()" class="w-full bg-[#1D1D1F] text-white py-4 rounded-[18px] font-semibold text-[16px] apple-shadow hover:bg-[#000000] transition-all apple-btn flex justify-center items-center gap-2 mt-auto shrink-0">
+                <i data-feather="play" class="w-4 h-4 fill-current"></i> 启动智能排产
+            </button>
+        </aside>
+
+        <section class="flex-grow p-8 overflow-hidden relative bg-[#F5F5F7]">
+            
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-[#86868B] transition-opacity duration-300 z-10">
+                <div class="bg-white p-6 rounded-[28px] apple-shadow mb-4">
+                    <i data-feather="cpu" class="w-12 h-12 text-[#007AFF] opacity-80"></i>
+                </div>
+                <h3 class="text-[17px] font-medium text-[#1D1D1F]">等待算法引擎演算</h3>
+                <p class="text-[14px] mt-1">请在左侧配置参数并点击启动</p>
+            </div>
+
+            <div id="resultPanel" class="hidden flex flex-col h-full gap-6 max-w-[1600px] mx-auto opacity-0 transition-opacity duration-500">
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="layers" class="w-20 h-20 text-[#007AFF]"></i></div>
+                        <p class="text-[14px] font-medium text-[#86868B] mb-2">实际消耗原材</p>
+                        <h3 class="text-[40px] font-bold text-[#1D1D1F] leading-none" id="resUsed">0 <span class="text-[16px] font-medium text-[#86868B]">根</span></h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="scissors" class="w-20 h-20 text-[#FF3B30]"></i></div>
+                        <p class="text-[14px] font-medium text-[#86868B] mb-2">产生废料总计</p>
+                        <h3 class="text-[40px] font-bold text-[#FF3B30] leading-none" id="resWaste">0 <span class="text-[16px] font-medium text-[#FF8682]">mm</span></h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="pie-chart" class="w-20 h-20 text-[#34C759]"></i></div>
+                        <p class="text-[14px] font-medium text-[#86868B] mb-2">材料综合利用率</p>
+                        <h3 class="text-[40px] font-bold text-[#34C759] leading-none" id="resRate">0.00 <span class="text-[20px] font-medium text-[#8EE0A1]">%</span></h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 flex-grow overflow-hidden pb-4">
+                    
+                    <div class="xl:col-span-2 bg-white rounded-[28px] apple-shadow flex flex-col overflow-hidden relative">
+                        <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 bg-white/95 backdrop-blur z-20 shadow-sm flex justify-between items-center">
+                            <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
+                                <div class="w-1.5 h-5 bg-[#007AFF] rounded-full"></div> 方案执行明细
+                            </h3>
+                            </div>
+                        <div id="aiAnalysis" class="flex-grow overflow-y-auto p-5 space-y-4 bg-[#F9F9FB] scroll-list-padding">
+                            </div>
+                    </div>
+
+                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden">
+                        <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 z-20 shadow-sm flex justify-between items-center">
+                            <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
+                                <div class="w-1.5 h-5 bg-[#5E5CE6] rounded-full"></div> 全局排样映射图
+                            </h3>
+                            <span class="text-[12px] font-medium text-[#86868B] bg-[#F2F2F7] px-2.5 py-1 rounded-lg">展示所有切割配方</span>
+                        </div>
+                        
+                        <div id="chartScrollContainer" class="flex-grow overflow-y-auto relative bg-[#FCFCFC] p-4">
+                            <div id="ganttChart" class="w-full"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toastContainer" class="fixed top-4 inset-x-0 z-50 flex flex-col items-center pointer-events-none gap-2"></div>
+
+    <script>
+        feather.replace();
+
+        let myChart = null;
+
+        // 恢复代码二的初始固定数据
+        let stocks =[{len: 12000, inv: 200}];
+        let demands =[
+            {len: 5800, dem: 45}, {len: 4200, dem: 60}, {len: 3500, dem: 80},
+            {len: 2800, dem: 55}, {len: 2100, dem: 110}, {len: 1500, dem: 140}
+        ];
+        let currentSolution = null;
+
+        // 初始化渲染初始数据
+        renderStocks();
+        renderTable();
+
+        function showToast(message, type = 'warning') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colorClass = type === 'error' || type === 'warning' ? 'text-[#FF3B30]' : 'text-[#007AFF]';
+            const iconName = type === 'error' || type === 'warning' ? 'alert-circle' : 'info';
+
+            toast.className = `flex items-center gap-2 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-[rgba(0,0,0,0.05)] text-[14px] font-medium text-[#1D1D1F] transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] toast-enter`;
+            toast.innerHTML = `<i data-feather="${iconName}" class="w-5 h-5 ${colorClass}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            feather.replace();
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-active');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('toast-active');
+                toast.classList.add('toast-enter');
+                setTimeout(() => toast.remove(), 400); 
+            }, 3000);
+        }
+
+        function renderStocks() {
+            let html = '';
+            stocks.forEach((item, i) => html += `
+                <div class="grid grid-cols-3 py-2.5 text-center border-b border-gray-50 hover:bg-[#F9F9FB] rounded-lg transition-colors group">
+                    <div class="font-semibold text-[#34C759]">${item.len}</div>
+                    <div class="text-[#1D1D1F]">${item.inv}</div>
+                    <div>
+                        <button onclick="stocks.splice(${i},1);renderStocks()" class="text-[#86868B] hover:text-[#FF3B30] opacity-0 group-hover:opacity-100 transition-all">
+                            <i data-feather="minus-circle" class="w-4 h-4 mx-auto"></i>
+                        </button>
+                    </div>
+                </div>`);
+            document.getElementById('stockBody').innerHTML = html; feather.replace();
+        }
+
+        function addStock() {
+            let l = Number(document.getElementById('newStockLen').value);
+            let i = Number(document.getElementById('newStockInv').value);
+            
+            if(!l || !i || l <= 0 || i <= 0 || !Number.isInteger(l) || !Number.isInteger(i)) {
+                return showToast('请输入大于 0 的有效整数', 'warning'); 
+            }
+            
+            stocks.push({len: l, inv: i}); 
+            renderStocks();
+            document.getElementById('newStockLen').value = ''; document.getElementById('newStockInv').value = '';
+            showToast('录入成功', 'info');
+        }
+        
+        function renderTable() {
+            let html = '';
+            demands.forEach((item, i) => html += `
+                <div class="grid grid-cols-3 py-2.5 text-center border-b border-gray-50 hover:bg-[#F9F9FB] rounded-lg transition-colors group">
+                    <div class="font-medium text-[#007AFF]">${item.len}</div>
+                    <div class="text-[#1D1D1F]">${item.dem}</div>
+                    <div>
+                        <button onclick="demands.splice(${i},1);renderTable()" class="text-[#86868B] hover:text-[#FF3B30] opacity-0 group-hover:opacity-100 transition-all">
+                            <i data-feather="minus-circle" class="w-4 h-4 mx-auto"></i>
+                        </button>
+                    </div>
+                </div>`);
+            document.getElementById('demandBody').innerHTML = html; feather.replace();
+        }
+
+        function addRow() {
+            let l = Number(document.getElementById('newLen').value);
+            let d = Number(document.getElementById('newDem').value);
+            
+            if(!l || !d || l <= 0 || d <= 0 || !Number.isInteger(l) || !Number.isInteger(d)) {
+                return showToast('请输入大于 0 的有效整数', 'warning'); 
+            }
+            
+            demands.unshift({len: l, dem: d}); 
+            renderTable();
+            document.getElementById('newLen').value = ''; document.getElementById('newDem').value = '';
+            showToast('加单成功', 'info');
+        }
+
+        // 补充导入Excel的空函数（避免报错）
+        function importExcel() {
+            showToast('Excel导入功能暂未实现', 'warning');
+        }
+
+        function heuristicMultiStock(availableStocks, reqs, kerf) {
+            let items =[];
+            for(let r of reqs) for(let i=0; i<r.dem; i++) items.push(r.len);
+            items.sort((a,b) => b - a);
+
+            let stockState = JSON.parse(JSON.stringify(availableStocks)).sort((a,b) => a.len - b.len);
+            let bins =[];
+            let minReqLength = Math.min(...reqs.map(r => r.len)); 
+            
+            for(let item of items) {
+                let bestBinIdx = -1, minWaste = Infinity;
+                for(let i=0; i<bins.length; i++) {
+                    let cost = bins[i].items.length === 0 ? item : item + kerf;
+                    let currentUsed = bins[i].items.reduce((a,b)=>a+b,0) + (bins[i].items.length>0 ? (bins[i].items.length-1)*kerf : 0);
+                    if(currentUsed + cost <= bins[i].stockLen) {
+                        let waste = bins[i].stockLen - (currentUsed + cost);
+                        if(waste < minWaste) { minWaste = waste; bestBinIdx = i; }
+                    }
+                }
+                if(bestBinIdx !== -1) { bins[bestBinIdx].items.push(item); } 
+                else {
+                    let bestStockIdx = -1, minStockWaste = Infinity;
+                    for(let i=0; i<stockState.length; i++) {
+                        if(stockState[i].inv > 0 && stockState[i].len >= item) {
+                            let waste = stockState[i].len - item;
+                            if(waste < minStockWaste) { minStockWaste = waste; bestStockIdx = i; }
+                        }
+                    }
+                    if(bestStockIdx !== -1) {
+                        bins.push({ stockLen: stockState[bestStockIdx].len, items: [item] });
+                        stockState[bestStockIdx].inv--;
+                    } else return null;
+                }
+            }
+
+            let patternMap = {}, totalWaste = 0;
+            bins.forEach(b => {
+                let counts = {}; b.items.forEach(l => counts[l] = (counts[l]||0) + 1);
+                let sortedLens = Object.keys(counts).sort((a,b)=>b-a);
+                let keyStr = b.stockLen + '_' + sortedLens.map(l => `${l}x${counts[l]}`).join('_');
+                let usedLen = b.items.reduce((s,v)=>s+v,0) + (b.items.length>1 ? (b.items.length-1)*kerf : 0);
+                let waste = b.stockLen - usedLen;
+                totalWaste += waste;
+
+                if(!patternMap[keyStr]) patternMap[keyStr] = { stockLen: b.stockLen, comboStr: sortedLens.map(l => `${l}mm × ${counts[l]}`).join(' + '), items: sortedLens.map(l => ({len: parseInt(l), count: counts[l]})), waste: waste, freq: 0, usedLen: usedLen };
+                patternMap[keyStr].freq++;
+            });
+
+            return { totalBins: bins.length, totalWaste: totalWaste, minReqLength: minReqLength, patterns: Object.values(patternMap).sort((a,b) => b.freq - a.freq) };
+        }
+
+        // --- 🌟 修复点 1: 交互逻辑增加图表容器滚动 ---
+        function highlightChart(idx) {
+            if(myChart) {
+                // 点亮柱子并展示 Tooltip
+                myChart.dispatchAction({ type: 'highlight', dataIndex: idx });
+                
+                let option = myChart.getOption();
+                let validSeriesIdx = 0;
+                if (option && option.series) {
+                    for(let i = 0; i < option.series.length; i++) {
+                        if(option.series[i].data[idx] !== '-') {
+                            validSeriesIdx = i; break;
+                        }
+                    }
+                }
+                myChart.dispatchAction({ type: 'showTip', seriesIndex: validSeriesIdx, dataIndex: idx });
+
+                // 计算柱子 Y 坐标，让外层滚动条同步跟上 (保证柱子在视图中央可见)
+                try {
+                    // API convertToPixel 可以将数据坐标换算为像素值
+                    let pixelY = myChart.convertToPixel({ yAxisIndex: 0 }, idx);
+                    let scrollContainer = document.getElementById('chartScrollContainer');
+                    if (scrollContainer && typeof pixelY === 'number') {
+                        // 目标滚动高度 = 柱子的像素 Y 坐标 - 容器的一半高度 (使其居中)
+                        let targetScroll = pixelY - (scrollContainer.clientHeight / 2);
+                        scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                    }
+                } catch(e) {
+                    console.log("Scroll sync skip.");
+                }
+            }
+        }
+
+        function downplayChart(idx) {
+            if(myChart) {
+                myChart.dispatchAction({ type: 'downplay', dataIndex: idx });
+                myChart.dispatchAction({ type: 'hideTip' });
+            }
+        }
+
+        // --- 运算视图生成 ---
+        function runOptimization() {
+            if(demands.length === 0 || stocks.length === 0) return showToast("配置信息不完整，请补充数据", "warning");
+            
+            let kerfVal = parseInt(document.getElementById('kerf').value);
+            if(isNaN(kerfVal) || kerfVal < 0) kerfVal = 0;
+
+            currentSolution = heuristicMultiStock(stocks, demands, kerfVal);
+            if(!currentSolution) return showToast("库存不足或无法满足长料需求，排产失败", "error");
+
+            document.getElementById('emptyState').style.display = 'none';
+            const panel = document.getElementById('resultPanel');
+            panel.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.style.transition = 'opacity 0.6s ease';
+                panel.style.opacity = '1';
+            });
+
+            document.getElementById('resUsed').innerText = currentSolution.totalBins;
+            document.getElementById('resWaste').innerText = currentSolution.totalWaste;
+            let totalTarget = demands.reduce((sum, d) => sum + (d.len * d.dem), 0);
+            let totalAvailable = currentSolution.patterns.reduce((sum, p) => sum + (p.stockLen * p.freq), 0);
+            document.getElementById('resRate').innerText = ((totalTarget / totalAvailable) * 100).toFixed(2);
+
+            let listHtml = '';
+            currentSolution.patterns.forEach((p, idx) => {
+                let utilRate = ((p.usedLen / p.stockLen) * 100).toFixed(1);
+                let barColor = utilRate > 95 ? 'bg-[#34C759]' : (utilRate > 85 ? 'bg-[#007AFF]' : 'bg-[#FF9500]');
+                
+                let tagsHtml = p.items.map(item => 
+                    `<span class="inline-block bg-[#F2F2F7] text-[#1D1D1F] px-2.5 py-1 rounded-[6px] text-[13px] font-medium border border-[rgba(0,0,0,0.03)] mr-1.5 mb-1.5">
+                        ${item.len} <span class="text-[#86868B] mx-0.5">×</span> ${item.count}
+                    </span>`
+                ).join('');
+
+                listHtml += `
+                    <div id="list-card-${idx}" class="relative bg-white p-5 rounded-[20px] border border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
+                         onmouseenter="highlightChart(${idx})" onmouseleave="downplayChart(${idx})">
+                        
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2.5">
+                                <span class="bg-[#1D1D1F] text-white text-[12px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">P${idx + 1}</span>
+                                <span class="text-[#007AFF] text-[14px] font-semibold bg-[#E5F1FF] px-2.5 py-1 rounded-md">${p.stockLen} mm</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[22px] font-bold text-[#1D1D1F] leading-none">${p.freq} <span class="text-[13px] text-[#86868B] font-normal">次</span></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            ${tagsHtml}
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="flex-grow bg-[#F2F2F7] h-2 rounded-full overflow-hidden">
+                                <div class="${barColor} h-full rounded-full transition-all duration-1000" style="width: ${utilRate}%"></div>
+                            </div>
+                            <span class="text-[13px] font-semibold text-[#86868B] min-w-[40px] text-right">${utilRate}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('aiAnalysis').innerHTML = listHtml;
+            setTimeout(() => { renderDynamicChart(); }, 100);
+        }
+
+        // --- ECharts 渲染更新 ---
+        function renderDynamicChart() {
+            let pats = currentSolution.patterns; 
+            let uniqueLens =[...new Set(pats.flatMap(p => p.items.map(i => i.len)))].sort((a,b)=>b-a);
+            
+            const palette =['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#5856D6', '#5AC8FA'];
+            let colorMap = {}; uniqueLens.forEach((l, i) => colorMap[l] = palette[i % palette.length]);
+
+            let chartDom = document.getElementById('ganttChart');
+            
+            // 动态根据数据条数计算图表容器高度
+            let dynamicHeight = Math.max(600, pats.length * 75);
+            chartDom.style.height = dynamicHeight + 'px';
+
+            if (myChart) { myChart.dispose(); }
+            myChart = echarts.init(chartDom);
+
+            let seriesData =[];
+            
+            uniqueLens.forEach(len => {
+                let dataArray =[];
+                pats.forEach(p => { 
+                    let item = p.items.find(i => i.len === len); 
+                    dataArray.push(item ? item.len * item.count : '-'); 
+                });
+                seriesData.push({ 
+                    name: `定尺:${len}`, 
+                    type: 'bar', 
+                    stack: 'total', 
+                    barWidth: 32, 
+                    itemStyle: { color: colorMap[len], borderRadius: [2, 2, 2, 2], borderColor: '#fff', borderWidth: 1.5 }, 
+                    data: dataArray 
+                });
+            });
+            
+            seriesData.push({ 
+                name: '切缝与废料', 
+                type: 'bar', 
+                stack: 'total', 
+                barWidth: 32,
+                itemStyle: { color: '#E5E5EA', borderRadius: [0, 8, 8, 0] }, 
+                data: pats.map(p => p.waste === 0 ? '-' : p.waste) 
+            });
+
+            let maxStockUsed = Math.max(...pats.map(p => p.stockLen));
+
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: { 
+                    trigger: 'axis', 
+                    axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(0,122,255,0.04)' } },
+                    backgroundColor: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(20px)',
+                    borderColor: 'rgba(0,0,0,0.05)',
+                    padding: 16,
+                    textStyle: { color: '#1D1D1F' },
+                    extraCssText: 'box-shadow: 0 10px 40px rgba(0,0,0,0.12); border-radius: 16px;',
+                    formatter: function(params) {
+                        let pat = pats[params[0].dataIndex];
+                        return `
+                            <div class="font-sans">
+                                <div class="text-[13px] text-[#86868B] mb-1.5 font-medium">切割模式 ${params[0].dataIndex + 1}</div>
+                                <div class="font-bold text-[15px] mb-2.5 text-[#1D1D1F]">原材: ${pat.stockLen}mm</div>
+                                <div class="text-[14px] text-[#515154] mb-3 leading-relaxed max-w-[200px] whitespace-normal">配方: ${pat.comboStr}</div>
+                                <div class="font-semibold text-[14px] bg-[#F2F2F7] px-3 py-1.5 rounded-lg inline-block">执行频次: <span class="text-[#007AFF] ml-1">${pat.freq} 次</span></div>
+                            </div>
+                        `;
+                    }
+                },
+                legend: { 
+                    data: uniqueLens.map(l => `定尺:${l}`).concat(['切缝与废料']), 
+                    bottom: 0,
+                    icon: 'circle',
+                    itemWidth: 12,
+                    textStyle: { color: '#86868B', fontFamily: '-apple-system', fontSize: 13 }
+                },
+                grid: { left: '3%', right: '5%', bottom: '40px', top: '20px', containLabel: true },
+                xAxis: { 
+                    type: 'value', 
+                    max: maxStockUsed,
+                    splitLine: { lineStyle: { color: '#F2F2F7', type: 'dashed' } },
+                    axisLabel: { color: '#86868B', fontFamily: '-apple-system', fontSize: 12 },
+                    axisLine: { show: false }
+                },
+                yAxis: { 
+                    type: 'category', 
+                    inverse: true, 
+                    data: pats.map((p,i) => `P${i+1}`), 
+                    axisLine: {show: false}, 
+                    axisTick: {show: false}, 
+                    axisLabel: { fontWeight: '600', fontSize: 14, color: '#1D1D1F', fontFamily: '-apple-system', margin: 16 } 
+                },
+                series: seriesData
+            };
+            
+            myChart.setOption(option, true); 
+            myChart.resize();
+            
+            myChart.on('mouseover', function(params) {
+                let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
+                if(targetCard) {
+                    targetCard.classList.add('list-card-active');
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+            myChart.on('mouseout', function(params) {
+                let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
+                if(targetCard) {
+                    targetCard.classList.remove('list-card-active');
+                }
+            });
+
+            window.addEventListener('resize', () => myChart.resize());
+        }
+    </script>
+</body>
+</html>
