@@ -64,25 +64,35 @@
         /* Toast 动画样式 */
         .toast-enter { transform: translateY(-20px); opacity: 0; }
         .toast-active { transform: translateY(0); opacity: 1; }
+
+        /* 防止 iOS 聚焦输入框时自动放大页面 */
+        @media (max-width: 768px) {
+            input,
+            select,
+            textarea,
+            button {
+                font-size: 16px !important;
+            }
+        }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-x-auto overflow-y-hidden min-w-[1024px]">
+<body class="min-h-screen md:h-screen flex flex-col overflow-x-hidden md:overflow-x-auto overflow-y-auto md:overflow-y-hidden min-w-0 md:min-w-[1024px]">
 
-    <header class="glass-header px-6 py-4 flex justify-between items-center shrink-0 z-20">
+    <header class="glass-header px-4 md:px-6 py-3 md:py-4 flex justify-between items-center shrink-0 z-20">
         <div class="flex items-center gap-3">
             <div class="bg-[#007AFF] p-1.5 rounded-lg text-white shadow-sm">
                 <i data-feather="layers" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-[17px] font-semibold tracking-tight text-[#1D1D1F]">RCOS 智能决策工作台</h1>
-                <p class="text-[11px] font-medium text-[#86868B] tracking-wide uppercase mt-0.5">Multi-stock 1D-CSP Optimizer</p>
+                <h1 class="text-[15px] md:text-[17px] font-semibold tracking-tight text-[#1D1D1F]">RCOS 智能决策工作台</h1>
+                <p class="text-[10px] md:text-[11px] font-medium text-[#86868B] tracking-wide uppercase mt-0.5">Multi-stock 1D-CSP Optimizer</p>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow flex overflow-hidden">
+    <main class="flex-grow flex flex-col md:flex-row overflow-visible md:overflow-hidden">
         
-        <aside class="w-[400px] bg-[#F5F5F7] flex flex-col shrink-0 overflow-y-auto z-10 p-5 gap-5 border-r border-[rgba(0,0,0,0.05)]">
+        <aside class="w-full md:w-[400px] bg-[#F5F5F7] flex flex-col shrink-0 overflow-y-visible md:overflow-y-auto z-10 p-4 md:p-5 gap-4 md:gap-5 md:border-r border-[rgba(0,0,0,0.05)]">
             
             <section class="bg-white rounded-[20px] p-5 apple-shadow">
                 <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
@@ -162,7 +172,7 @@
             </button>
         </aside>
 
-        <section class="flex-grow p-8 overflow-hidden relative bg-[#F5F5F7]">
+        <section class="flex-grow p-4 md:p-8 overflow-visible md:overflow-hidden relative bg-[#F5F5F7] min-h-[65vh] md:min-h-0">
             
             <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-[#86868B] transition-opacity duration-300 z-10">
                 <div class="bg-white p-6 rounded-[28px] apple-shadow mb-4">
@@ -172,7 +182,7 @@
                 <p class="text-[14px] mt-1">请在左侧配置参数并点击启动</p>
             </div>
 
-            <div id="resultPanel" class="hidden flex flex-col h-full gap-6 max-w-[1600px] mx-auto opacity-0 transition-opacity duration-500">
+            <div id="resultPanel" class="hidden flex flex-col md:h-full gap-4 md:gap-6 max-w-[1600px] mx-auto opacity-0 transition-opacity duration-500">
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
                     <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
@@ -192,9 +202,9 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 flex-grow overflow-hidden pb-4">
+                <div class="grid grid-cols-1 xl:grid-cols-5 gap-4 md:gap-6 flex-grow overflow-visible md:overflow-hidden pb-4">
                     
-                    <div class="xl:col-span-2 bg-white rounded-[28px] apple-shadow flex flex-col overflow-hidden relative">
+                    <div class="xl:col-span-2 bg-white rounded-[28px] apple-shadow flex flex-col overflow-hidden relative min-h-[360px] md:min-h-0">
                         <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 bg-white/95 backdrop-blur z-20 shadow-sm flex justify-between items-center">
                             <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
                                 <div class="w-1.5 h-5 bg-[#007AFF] rounded-full"></div> 方案执行明细
@@ -209,7 +219,7 @@
                     </div>
 
                     <!-- 修复点 1：为外层容器增加 relative 和底部内边距，容纳绝对定位的图例 -->
-                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden relative pb-[40px]">
+                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden relative pb-[40px] min-h-[420px] md:min-h-0">
                         <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 z-20 shadow-sm flex justify-between items-center">
                             <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
                                 <div class="w-1.5 h-5 bg-[#5E5CE6] rounded-full"></div> 全局排样映射图
