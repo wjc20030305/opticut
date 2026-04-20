@@ -97,6 +97,26 @@
                 </div>
             </section>
 
+
+            <section class="bg-white rounded-[20px] p-5 apple-shadow">
+                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+                    <i data-feather="cpu" class="w-4 h-4 text-[#FF9500]"></i> 算法选择
+                </h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="algoExactBtn" onclick="setAlgorithmMode('exact')" class="rounded-xl border border-transparent bg-[#F2F2F7] px-3 py-3 text-left transition-all apple-btn hover:border-[#007AFF] hover:bg-[#F0F7FF]">
+                        <div class="text-[14px] font-semibold text-[#1D1D1F]">精确算法</div>
+                        <div class="mt-0.5 text-[12px] text-[#86868B]">适用于小批量</div>
+                    </button>
+                    <button id="algoGaBtn" onclick="setAlgorithmMode('ga')" class="rounded-xl border border-transparent bg-[#F2F2F7] px-3 py-3 text-left transition-all apple-btn hover:border-[#007AFF] hover:bg-[#F0F7FF]">
+                        <div class="text-[14px] font-semibold text-[#1D1D1F]">遗传算法</div>
+                        <div class="mt-0.5 text-[12px] text-[#86868B]">适用于大批量</div>
+                    </button>
+                </div>
+                <p class="mt-3 text-[12px] leading-relaxed text-[#86868B]">
+                    小规模订单建议使用精确算法以获得最优整数解；大规模订单建议使用遗传算法以提高计算效率。
+                </p>
+            </section>
+
             <section class="bg-white rounded-[20px] p-5 apple-shadow flex flex-col max-h-[300px]">
                 <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
                     <i data-feather="package" class="w-4 h-4 text-[#34C759]"></i> 仓库可用原材
@@ -179,12 +199,17 @@
                             <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
                                 <div class="w-1.5 h-5 bg-[#007AFF] rounded-full"></div> 方案执行明细
                             </h3>
-                            </div>
+                            <!-- 修复点 3：新增 Excel 导出按钮 -->
+                            <button onclick="exportResultExcel()" class="bg-[#007AFF] text-white px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-[#0062cc] transition-colors apple-btn flex items-center gap-1.5">
+                                <i data-feather="download" class="w-3.5 h-3.5"></i> 导出Excel
+                            </button>
+                        </div>
                         <div id="aiAnalysis" class="flex-grow overflow-y-auto p-5 space-y-4 bg-[#F9F9FB] scroll-list-padding">
-                            </div>
+                        </div>
                     </div>
 
-                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden">
+                    <!-- 修复点 1：为外层容器增加 relative 和底部内边距，容纳绝对定位的图例 -->
+                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden relative pb-[40px]">
                         <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 z-20 shadow-sm flex justify-between items-center">
                             <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
                                 <div class="w-1.5 h-5 bg-[#5E5CE6] rounded-full"></div> 全局排样映射图
@@ -195,6 +220,10 @@
                         <div id="chartScrollContainer" class="flex-grow overflow-y-auto relative bg-[#FCFCFC] p-4">
                             <div id="ganttChart" class="w-full"></div>
                         </div>
+                        <!-- 修复点 1：固定在底部的图例容器 -->
+                        <div id="fixedLegendContainer" class="absolute bottom-0 left-0 w-full h-[40px] bg-white/90 backdrop-blur border-t border-[#F2F2F7] flex justify-center items-center z-10 pointer-events-none">
+                            <div id="ganttLegend" class="w-full h-full pointer-events-auto"></div>
+                        </div>
                     </div>
 
                 </div>
@@ -204,33 +233,61 @@
 
     <div id="toastContainer" class="fixed top-4 inset-x-0 z-50 flex flex-col items-center pointer-events-none gap-2"></div>
 
+    
     <script>
         feather.replace();
 
         let myChart = null;
+        let legendChart = null;
 
-        // 恢复代码二的初始固定数据
-        let stocks =[{len: 12000, inv: 200}];
-        let demands =[
-            {len: 5800, dem: 45}, {len: 4200, dem: 60}, {len: 3500, dem: 80},
-            {len: 2800, dem: 55}, {len: 2100, dem: 110}, {len: 1500, dem: 140}
+        let stocks = [{ len: 12000, inv: 200 }];
+        let demands = [
+            { len: 5800, dem: 45 }, { len: 4200, dem: 60 }, { len: 3500, dem: 80 },
+            { len: 2800, dem: 55 }, { len: 2100, dem: 110 }, { len: 1500, dem: 140 }
         ];
         let currentSolution = null;
+        let selectedAlgorithm = 'ga';
 
-        // 初始化渲染初始数据
         renderStocks();
         renderTable();
+        setAlgorithmMode('ga');
+
+        function setAlgorithmMode(mode) {
+            selectedAlgorithm = mode;
+            const exactBtn = document.getElementById('algoExactBtn');
+            const gaBtn = document.getElementById('algoGaBtn');
+            if (!exactBtn || !gaBtn) return;
+
+            const activeCls = 'border-[#1D1D1F] bg-[#1D1D1F] text-white shadow-sm';
+            const inactiveCls = 'border-transparent bg-[#F2F2F7] text-[#1D1D1F] hover:border-[#007AFF] hover:bg-[#F0F7FF]';
+
+            if (mode === 'exact') {
+                exactBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${activeCls}`;
+                gaBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${inactiveCls}`;
+                exactBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-white';
+                gaBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-[#1D1D1F]';
+                exactBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#E5E5E5]';
+                gaBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#86868B]';
+            } else {
+                gaBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${activeCls}`;
+                exactBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${inactiveCls}`;
+                gaBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-white';
+                exactBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-[#1D1D1F]';
+                gaBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#E5E5E5]';
+                exactBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#86868B]';
+            }
+        }
 
         function showToast(message, type = 'warning') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
-            
+
             const colorClass = type === 'error' || type === 'warning' ? 'text-[#FF3B30]' : 'text-[#007AFF]';
             const iconName = type === 'error' || type === 'warning' ? 'alert-circle' : 'info';
 
             toast.className = `flex items-center gap-2 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-[rgba(0,0,0,0.05)] text-[14px] font-medium text-[#1D1D1F] transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] toast-enter`;
             toast.innerHTML = `<i data-feather="${iconName}" class="w-5 h-5 ${colorClass}"></i> <span>${message}</span>`;
-            
+
             container.appendChild(toast);
             feather.replace();
 
@@ -242,7 +299,7 @@
             setTimeout(() => {
                 toast.classList.remove('toast-active');
                 toast.classList.add('toast-enter');
-                setTimeout(() => toast.remove(), 400); 
+                setTimeout(() => toast.remove(), 400);
             }, 3000);
         }
 
@@ -258,23 +315,25 @@
                         </button>
                     </div>
                 </div>`);
-            document.getElementById('stockBody').innerHTML = html; feather.replace();
+            document.getElementById('stockBody').innerHTML = html;
+            feather.replace();
         }
 
         function addStock() {
             let l = Number(document.getElementById('newStockLen').value);
             let i = Number(document.getElementById('newStockInv').value);
-            
-            if(!l || !i || l <= 0 || i <= 0 || !Number.isInteger(l) || !Number.isInteger(i)) {
-                return showToast('请输入大于 0 的有效整数', 'warning'); 
+
+            if (!l || !i || l <= 0 || i <= 0 || !Number.isInteger(l) || !Number.isInteger(i)) {
+                return showToast('请输入大于 0 的有效整数', 'warning');
             }
-            
-            stocks.push({len: l, inv: i}); 
+
+            stocks.push({ len: l, inv: i });
             renderStocks();
-            document.getElementById('newStockLen').value = ''; document.getElementById('newStockInv').value = '';
+            document.getElementById('newStockLen').value = '';
+            document.getElementById('newStockInv').value = '';
             showToast('录入成功', 'info');
         }
-        
+
         function renderTable() {
             let html = '';
             demands.forEach((item, i) => html += `
@@ -287,128 +346,612 @@
                         </button>
                     </div>
                 </div>`);
-            document.getElementById('demandBody').innerHTML = html; feather.replace();
+            document.getElementById('demandBody').innerHTML = html;
+            feather.replace();
         }
 
         function addRow() {
             let l = Number(document.getElementById('newLen').value);
             let d = Number(document.getElementById('newDem').value);
-            
-            if(!l || !d || l <= 0 || d <= 0 || !Number.isInteger(l) || !Number.isInteger(d)) {
-                return showToast('请输入大于 0 的有效整数', 'warning'); 
+
+            if (!l || !d || l <= 0 || d <= 0 || !Number.isInteger(l) || !Number.isInteger(d)) {
+                return showToast('请输入大于 0 的有效整数', 'warning');
             }
-            
-            demands.unshift({len: l, dem: d}); 
+
+            demands.unshift({ len: l, dem: d });
             renderTable();
-            document.getElementById('newLen').value = ''; document.getElementById('newDem').value = '';
+            document.getElementById('newLen').value = '';
+            document.getElementById('newDem').value = '';
             showToast('加单成功', 'info');
         }
 
-        // 补充导入Excel的空函数（避免报错）
         function importExcel() {
-            showToast('Excel导入功能暂未实现', 'warning');
-        }
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            if (!file) return;
 
-        function heuristicMultiStock(availableStocks, reqs, kerf) {
-            let items =[];
-            for(let r of reqs) for(let i=0; i<r.dem; i++) items.push(r.len);
-            items.sort((a,b) => b - a);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            let stockState = JSON.parse(JSON.stringify(availableStocks)).sort((a,b) => a.len - b.len);
-            let bins =[];
-            let minReqLength = Math.min(...reqs.map(r => r.len)); 
-            
-            for(let item of items) {
-                let bestBinIdx = -1, minWaste = Infinity;
-                for(let i=0; i<bins.length; i++) {
-                    let cost = bins[i].items.length === 0 ? item : item + kerf;
-                    let currentUsed = bins[i].items.reduce((a,b)=>a+b,0) + (bins[i].items.length>0 ? (bins[i].items.length-1)*kerf : 0);
-                    if(currentUsed + cost <= bins[i].stockLen) {
-                        let waste = bins[i].stockLen - (currentUsed + cost);
-                        if(waste < minWaste) { minWaste = waste; bestBinIdx = i; }
+                    if (!json || json.length < 2) {
+                        showToast('Excel解析失败，请检查格式', 'error');
+                        return;
                     }
-                }
-                if(bestBinIdx !== -1) { bins[bestBinIdx].items.push(item); } 
-                else {
-                    let bestStockIdx = -1, minStockWaste = Infinity;
-                    for(let i=0; i<stockState.length; i++) {
-                        if(stockState[i].inv > 0 && stockState[i].len >= item) {
-                            let waste = stockState[i].len - item;
-                            if(waste < minStockWaste) { minStockWaste = waste; bestStockIdx = i; }
+
+                    let headers = json[0].map(h => String(h).trim());
+                    let lenIdx = headers.findIndex(h => h.includes('定尺') || h.includes('length') || h.includes('规格'));
+                    let demIdx = headers.findIndex(h => h.includes('需求') || h.includes('demand') || h.includes('数量'));
+
+                    if (lenIdx === -1 || demIdx === -1) {
+                        showToast('Excel解析失败，请检查格式', 'error');
+                        return;
+                    }
+
+                    let addedCount = 0;
+                    for (let i = 1; i < json.length; i++) {
+                        let row = json[i];
+                        if (!row || row[lenIdx] === undefined || row[demIdx] === undefined) continue;
+
+                        let l = Number(row[lenIdx]);
+                        let d = Number(row[demIdx]);
+
+                        if (l > 0 && d > 0 && Number.isInteger(l) && Number.isInteger(d)) {
+                            demands.push({ len: l, dem: d });
+                            addedCount++;
                         }
                     }
-                    if(bestStockIdx !== -1) {
-                        bins.push({ stockLen: stockState[bestStockIdx].len, items: [item] });
-                        stockState[bestStockIdx].inv--;
-                    } else return null;
+
+                    if (addedCount > 0) {
+                        renderTable();
+                        showToast(`Excel导入成功，新增${addedCount}条数据`, 'info');
+                    } else {
+                        showToast('Excel解析失败，请检查格式', 'error');
+                    }
+
+                } catch (err) {
+                    showToast('Excel解析失败，请检查格式', 'error');
+                } finally {
+                    fileInput.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function exportResultExcel() {
+            if (!currentSolution || !currentSolution.patterns || currentSolution.patterns.length === 0) {
+                showToast('暂无方案数据可导出', 'warning');
+                return;
+            }
+
+            const ws_data = [["模式", "原材(mm)", "配方"]];
+
+            currentSolution.patterns.forEach((p, idx) => {
+                let modeStr = `P${idx + 1}`;
+                let rawLen = p.stockLen;
+
+                let comboStrParts = [];
+                p.items.forEach(item => {
+                    comboStrParts.push(`${item.len}mm × ${item.count}`);
+                });
+                let formulaStr = comboStrParts.join(' + ');
+
+                ws_data.push([modeStr, rawLen, formulaStr]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 50 }];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "方案明细");
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
+
+            const filename = `钢筋下料方案_${timestamp}.xlsx`;
+            XLSX.writeFile(wb, filename);
+            showToast('方案已导出为Excel', 'info');
+        }
+
+        function getAlgoLabel() {
+            return selectedAlgorithm === 'exact' ? '精确算法' : '遗传算法';
+        }
+
+        function expandDemands(reqs) {
+            const items = [];
+            reqs.forEach((r, ridx) => {
+                for (let i = 0; i < r.dem; i++) {
+                    items.push({ id: `${ridx}_${i}_${r.len}`, len: Number(r.len) });
+                }
+            });
+            return items;
+        }
+
+        function cloneStocks(list) {
+            return list.map(s => ({ len: Number(s.len), inv: Number(s.inv) }));
+        }
+
+        function cloneBins(bins) {
+            return bins.map(b => ({
+                stockLen: b.stockLen,
+                residual: b.residual,
+                items: b.items.map(x => Number(x))
+            }));
+        }
+
+        function aggregateBinsToSolution(bins, kerf) {
+            let patternMap = new Map();
+            let totalWaste = 0;
+            let totalUsed = 0;
+
+            bins.forEach(bin => {
+                const counts = {};
+                bin.items.forEach(l => counts[l] = (counts[l] || 0) + 1);
+                const sortedLens = Object.keys(counts).map(Number).sort((a, b) => b - a);
+                const keyStr = `${bin.stockLen}_${sortedLens.map(l => `${l}x${counts[l]}`).join('_')}`;
+                const usedLen = bin.items.reduce((s, v) => s + v, 0) + Math.max(0, bin.items.length - 1) * kerf;
+                const waste = bin.stockLen - usedLen;
+                totalWaste += waste;
+                totalUsed += bin.stockLen;
+
+                if (!patternMap.has(keyStr)) {
+                    patternMap.set(keyStr, {
+                        stockLen: bin.stockLen,
+                        comboStr: sortedLens.map(l => `${l}mm × ${counts[l]}`).join(' + '),
+                        items: sortedLens.map(l => ({ len: parseInt(l), count: counts[l] })),
+                        waste: waste,
+                        freq: 0,
+                        usedLen: usedLen
+                    });
+                }
+                patternMap.get(keyStr).freq += 1;
+            });
+
+            const patterns = Array.from(patternMap.values()).sort((a, b) => b.freq - a.freq);
+            const totalTarget = demands.reduce((sum, d) => sum + d.len * d.dem, 0);
+            const utilization = totalUsed > 0 ? (totalTarget / totalUsed) * 100 : 0;
+
+            return {
+                totalBins: bins.length,
+                totalWaste,
+                totalTarget,
+                totalUsed,
+                utilization,
+                patterns
+            };
+        }
+
+        function placeItemGreedyOnBins(orderCatIds, itemMap, reqCategories, stockSource, kerf) {
+            const stockState = cloneStocks(stockSource).sort((a, b) => a.len - b.len);
+            const bins = [];
+
+            const categoryMap = new Map();
+            reqCategories.forEach(c => categoryMap.set(c.id, c));
+
+            for (const catId of orderCatIds) {
+                const cat = categoryMap.get(catId);
+                for (let t = 0; t < cat.dem; t++) {
+                    const itemLen = cat.len;
+                    let bestBinIdx = -1;
+                    let bestWaste = Infinity;
+
+                    for (let i = 0; i < bins.length; i++) {
+                        const bin = bins[i];
+                        const need = itemLen + kerf;
+                        if (bin.residual >= need) {
+                            const waste = bin.residual - need;
+                            if (waste < bestWaste) {
+                                bestWaste = waste;
+                                bestBinIdx = i;
+                            }
+                        }
+                    }
+
+                    if (bestBinIdx !== -1) {
+                        const bin = bins[bestBinIdx];
+                        bin.items.push(itemLen);
+                        bin.residual -= (itemLen + kerf);
+                    } else {
+                        let bestStockIdx = -1;
+                        let minWaste = Infinity;
+                        for (let i = 0; i < stockState.length; i++) {
+                            if (stockState[i].inv > 0 && stockState[i].len >= itemLen) {
+                                const waste = stockState[i].len - itemLen;
+                                if (waste < minWaste) {
+                                    minWaste = waste;
+                                    bestStockIdx = i;
+                                }
+                            }
+                        }
+                        if (bestStockIdx === -1) return null;
+
+                        const stock = stockState[bestStockIdx];
+                        bins.push({
+                            stockLen: stock.len,
+                            residual: stock.len - itemLen,
+                            items: [itemLen]
+                        });
+                        stock.inv -= 1;
+                    }
                 }
             }
 
-            let patternMap = {}, totalWaste = 0;
-            bins.forEach(b => {
-                let counts = {}; b.items.forEach(l => counts[l] = (counts[l]||0) + 1);
-                let sortedLens = Object.keys(counts).sort((a,b)=>b-a);
-                let keyStr = b.stockLen + '_' + sortedLens.map(l => `${l}x${counts[l]}`).join('_');
-                let usedLen = b.items.reduce((s,v)=>s+v,0) + (b.items.length>1 ? (b.items.length-1)*kerf : 0);
-                let waste = b.stockLen - usedLen;
-                totalWaste += waste;
-
-                if(!patternMap[keyStr]) patternMap[keyStr] = { stockLen: b.stockLen, comboStr: sortedLens.map(l => `${l}mm × ${counts[l]}`).join(' + '), items: sortedLens.map(l => ({len: parseInt(l), count: counts[l]})), waste: waste, freq: 0, usedLen: usedLen };
-                patternMap[keyStr].freq++;
-            });
-
-            return { totalBins: bins.length, totalWaste: totalWaste, minReqLength: minReqLength, patterns: Object.values(patternMap).sort((a,b) => b.freq - a.freq) };
+            return bins;
         }
 
-        // --- 🌟 修复点 1: 交互逻辑增加图表容器滚动 ---
+        function greedyPermutationDecode(order, reqCategories, stockSource, kerf) {
+            const stockState = cloneStocks(stockSource).sort((a, b) => a.len - b.len);
+            const bins = [];
+            const categoryMap = new Map(reqCategories.map(c => [c.id, c]));
+
+            for (const catId of order) {
+                const cat = categoryMap.get(catId);
+                if (!cat) continue;
+
+                for (let k = 0; k < cat.dem; k++) {
+                    const itemLen = cat.len;
+                    let bestBinIdx = -1;
+                    let minWaste = Infinity;
+
+                    for (let i = 0; i < bins.length; i++) {
+                        const bin = bins[i];
+                        const need = itemLen + kerf;
+                        if (bin.items.length > 0 && bin.residual >= need) {
+                            const waste = bin.residual - need;
+                            if (waste < minWaste) {
+                                minWaste = waste;
+                                bestBinIdx = i;
+                            }
+                        }
+                    }
+
+                    if (bestBinIdx !== -1) {
+                        const bin = bins[bestBinIdx];
+                        bin.items.push(itemLen);
+                        bin.residual -= (itemLen + kerf);
+                        continue;
+                    }
+
+                    let bestStockIdx = -1;
+                    let bestStockWaste = Infinity;
+                    for (let i = 0; i < stockState.length; i++) {
+                        if (stockState[i].inv > 0 && stockState[i].len >= itemLen) {
+                            const waste = stockState[i].len - itemLen;
+                            if (waste < bestStockWaste) {
+                                bestStockWaste = waste;
+                                bestStockIdx = i;
+                            }
+                        }
+                    }
+                    if (bestStockIdx === -1) return null;
+
+                    const stock = stockState[bestStockIdx];
+                    bins.push({
+                        stockLen: stock.len,
+                        residual: stock.len - itemLen,
+                        items: [itemLen]
+                    });
+                    stock.inv -= 1;
+                }
+            }
+
+            return bins;
+        }
+
+        function solveWithGA(stocksData, reqs, kerf) {
+            const categories = reqs.map((r, idx) => ({
+                id: `c${idx}`,
+                len: Number(r.len),
+                dem: Number(r.dem)
+            })).filter(c => c.dem > 0 && c.len > 0);
+
+            if (categories.length === 0) return null;
+
+            const categoryIds = categories.map(c => c.id);
+            const populationSize = Math.max(24, Math.min(60, categories.length * 8));
+            const generations = Math.max(50, Math.min(140, 20 + categories.length * 10));
+            const eliteCount = 2;
+            const crossoverRate = 0.85;
+            const mutationRate = 0.18;
+
+            function shuffle(arr) {
+                const a = arr.slice();
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            function evaluate(order) {
+                const bins = greedyPermutationDecode(order, categories, stocksData, kerf);
+                if (!bins) {
+                    return { score: Number.POSITIVE_INFINITY, ok: false, bins: null, patterns: [] };
+                }
+                const summary = aggregateBinsToSolution(bins, kerf);
+                const score = summary.totalWaste + bins.length * 0.001;
+                return {
+                    score,
+                    ok: true,
+                    bins,
+                    ...summary
+                };
+            }
+
+            function tournament(pop) {
+                const k = 3;
+                let best = null;
+                for (let i = 0; i < k; i++) {
+                    const cand = pop[Math.floor(Math.random() * pop.length)];
+                    if (!best || cand.score < best.score) best = cand;
+                }
+                return best;
+            }
+
+            function orderCrossover(p1, p2) {
+                const n = p1.length;
+                if (n <= 1) return p1.slice();
+                let a = Math.floor(Math.random() * n);
+                let b = Math.floor(Math.random() * n);
+                if (a > b) [a, b] = [b, a];
+
+                const child = Array(n).fill(null);
+                const used = new Set();
+
+                for (let i = a; i <= b; i++) {
+                    child[i] = p1[i];
+                    used.add(p1[i]);
+                }
+                let pos = (b + 1) % n;
+                for (let i = 0; i < n; i++) {
+                    const gene = p2[(b + 1 + i) % n];
+                    if (!used.has(gene)) {
+                        child[pos] = gene;
+                        used.add(gene);
+                        pos = (pos + 1) % n;
+                    }
+                }
+                return child;
+            }
+
+            function mutate(order) {
+                const out = order.slice();
+                if (out.length <= 1) return out;
+                const i = Math.floor(Math.random() * out.length);
+                const j = Math.floor(Math.random() * out.length);
+                [out[i], out[j]] = [out[j], out[i]];
+                if (out.length > 3 && Math.random() < 0.35) {
+                    let a = Math.floor(Math.random() * out.length);
+                    let b = Math.floor(Math.random() * out.length);
+                    if (a > b) [a, b] = [b, a];
+                    const seg = out.slice(a, b + 1).reverse();
+                    out.splice(a, seg.length, ...seg);
+                }
+                return out;
+            }
+
+            let population = [];
+            population.push(categoryIds.slice().sort((a, b) => {
+                const ca = categories.find(x => x.id === a);
+                const cb = categories.find(x => x.id === b);
+                return cb.len - ca.len;
+            }));
+            while (population.length < populationSize) {
+                population.push(shuffle(categoryIds));
+            }
+
+            let evaluated = population.map(order => ({ order, ...evaluate(order) })).sort((a, b) => a.score - b.score);
+            let globalBest = evaluated[0];
+
+            for (let gen = 0; gen < generations; gen++) {
+                evaluated.sort((a, b) => a.score - b.score);
+                if (evaluated[0].score < globalBest.score) globalBest = evaluated[0];
+
+                const nextPop = evaluated.slice(0, eliteCount).map(x => x.order.slice());
+
+                while (nextPop.length < populationSize) {
+                    const parent1 = tournament(evaluated).order;
+                    let child = parent1.slice();
+
+                    if (Math.random() < crossoverRate) {
+                        const parent2 = tournament(evaluated).order;
+                        child = orderCrossover(parent1, parent2);
+                    }
+                    if (Math.random() < mutationRate) {
+                        child = mutate(child);
+                    }
+                    nextPop.push(child);
+                }
+
+                evaluated = nextPop.map(order => ({ order, ...evaluate(order) }));
+            }
+
+            const bestEval = globalBest.ok ? globalBest : evaluated.sort((a, b) => a.score - b.score)[0];
+            if (!bestEval || !bestEval.ok) return null;
+
+            const finalSummary = aggregateBinsToSolution(bestEval.bins, kerf);
+            return {
+                ...finalSummary,
+                algorithmName: '遗传算法',
+                rawOrder: bestEval.order
+            };
+        }
+
+        function solveWithExact(stocksData, reqs, kerf) {
+            const items = expandDemands(reqs).sort((a, b) => b.len - a.len);
+            if (items.length === 0) return null;
+
+            const stockState = cloneStocks(stocksData).sort((a, b) => a.len - b.len);
+            const suffixLen = new Array(items.length + 1).fill(0);
+            for (let i = items.length - 1; i >= 0; i--) suffixLen[i] = suffixLen[i + 1] + items[i].len;
+
+            let bestWaste = Number.POSITIVE_INFINITY;
+            let bestBins = null;
+            const seen = new Map();
+            const timeLimitMs = 8000;
+            const start = performance.now();
+
+            function canonicalKey(idx, bins, stocks) {
+                const residuals = bins.map(b => b.residual).sort((a, b) => a - b).join(',');
+                const invKey = stocks.map(s => `${s.len}:${s.inv}`).join('|');
+                return `${idx}#${invKey}#${residuals}`;
+            }
+
+            function currentWaste(bins) {
+                return bins.reduce((sum, b) => sum + b.residual, 0);
+            }
+
+            function dfs(idx, bins, stocks) {
+                if (performance.now() - start > timeLimitMs) {
+                    throw new Error('EXACT_TIMEOUT');
+                }
+
+                if (idx === items.length) {
+                    const waste = currentWaste(bins);
+                    if (waste < bestWaste) {
+                        bestWaste = waste;
+                        bestBins = cloneBins(bins);
+                    }
+                    return;
+                }
+
+                const cw = currentWaste(bins);
+                const lb = Math.max(0, cw - suffixLen[idx]);
+                if (lb >= bestWaste) return;
+
+                const key = canonicalKey(idx, bins, stocks);
+                const prev = seen.get(key);
+                if (prev !== undefined && prev <= cw) return;
+                seen.set(key, cw);
+
+                const itemLen = items[idx].len;
+                const options = [];
+
+                for (let i = 0; i < bins.length; i++) {
+                    const bin = bins[i];
+                    const need = itemLen + kerf;
+                    if (bin.residual >= need) {
+                        options.push({ type: 'bin', idx: i, score: bin.residual - need });
+                    }
+                }
+
+                for (let s = 0; s < stocks.length; s++) {
+                    if (stocks[s].inv > 0 && stocks[s].len >= itemLen) {
+                        options.push({ type: 'new', idx: s, score: stocks[s].len - itemLen });
+                    }
+                }
+
+                options.sort((a, b) => a.score - b.score);
+
+                for (const opt of options) {
+                    if (opt.type === 'bin') {
+                        const bin = bins[opt.idx];
+                        bin.items.push(itemLen);
+                        bin.residual -= (itemLen + kerf);
+                        dfs(idx + 1, bins, stocks);
+                        bin.residual += (itemLen + kerf);
+                        bin.items.pop();
+                    } else {
+                        const st = stocks[opt.idx];
+                        st.inv -= 1;
+                        bins.push({
+                            stockLen: st.len,
+                            residual: st.len - itemLen,
+                            items: [itemLen]
+                        });
+                        dfs(idx + 1, bins, stocks);
+                        bins.pop();
+                        st.inv += 1;
+                    }
+                }
+            }
+
+            try {
+                dfs(0, [], cloneStocks(stockState));
+            } catch (err) {
+                if (err && err.message === 'EXACT_TIMEOUT') {
+                    showToast('精确算法搜索时间较长，已自动切换为遗传算法结果。', 'warning');
+                    return solveWithGA(stocksData, reqs, kerf);
+                }
+                throw err;
+            }
+
+            if (!bestBins) return null;
+            const summary = aggregateBinsToSolution(bestBins, kerf);
+            return {
+                ...summary,
+                algorithmName: '精确算法'
+            };
+        }
+
         function highlightChart(idx) {
-            if(myChart) {
-                // 点亮柱子并展示 Tooltip
+            if (myChart) {
                 myChart.dispatchAction({ type: 'highlight', dataIndex: idx });
-                
                 let option = myChart.getOption();
                 let validSeriesIdx = 0;
                 if (option && option.series) {
-                    for(let i = 0; i < option.series.length; i++) {
-                        if(option.series[i].data[idx] !== '-') {
+                    for (let i = 0; i < option.series.length; i++) {
+                        if (option.series[i].data[idx] !== '-') {
                             validSeriesIdx = i; break;
                         }
                     }
                 }
                 myChart.dispatchAction({ type: 'showTip', seriesIndex: validSeriesIdx, dataIndex: idx });
 
-                // 计算柱子 Y 坐标，让外层滚动条同步跟上 (保证柱子在视图中央可见)
                 try {
-                    // API convertToPixel 可以将数据坐标换算为像素值
                     let pixelY = myChart.convertToPixel({ yAxisIndex: 0 }, idx);
                     let scrollContainer = document.getElementById('chartScrollContainer');
                     if (scrollContainer && typeof pixelY === 'number') {
-                        // 目标滚动高度 = 柱子的像素 Y 坐标 - 容器的一半高度 (使其居中)
                         let targetScroll = pixelY - (scrollContainer.clientHeight / 2);
                         scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
                     }
-                } catch(e) {
-                    console.log("Scroll sync skip.");
-                }
+                } catch (e) { }
             }
         }
 
         function downplayChart(idx) {
-            if(myChart) {
+            if (myChart) {
                 myChart.dispatchAction({ type: 'downplay', dataIndex: idx });
                 myChart.dispatchAction({ type: 'hideTip' });
             }
         }
 
-        // --- 运算视图生成 ---
         function runOptimization() {
-            if(demands.length === 0 || stocks.length === 0) return showToast("配置信息不完整，请补充数据", "warning");
-            
-            let kerfVal = parseInt(document.getElementById('kerf').value);
-            if(isNaN(kerfVal) || kerfVal < 0) kerfVal = 0;
+            if (demands.length === 0 || stocks.length === 0) return showToast("配置信息不完整，请补充数据", "warning");
 
-            currentSolution = heuristicMultiStock(stocks, demands, kerfVal);
-            if(!currentSolution) return showToast("库存不足或无法满足长料需求，排产失败", "error");
+            let kerfVal = parseInt(document.getElementById('kerf').value);
+            if (isNaN(kerfVal) || kerfVal < 0) kerfVal = 0;
+
+            const algo = selectedAlgorithm;
+            const totalDemandCount = demands.reduce((sum, d) => sum + d.dem, 0);
+
+            if (algo === 'exact' && totalDemandCount > 60) {
+                showToast('当前数据量较大，精确算法可能耗时较长，请优先使用遗传算法。', 'warning');
+            }
+
+            const workingStocks = cloneStocks(stocks);
+            let solution = null;
+
+            if (algo === 'exact') {
+                solution = solveWithExact(workingStocks, demands, kerfVal);
+            } else {
+                solution = solveWithGA(workingStocks, demands, kerfVal);
+            }
+
+            if (!solution) return showToast("库存不足或无法满足长料需求，排产失败", "error");
+
+            currentSolution = solution;
 
             document.getElementById('emptyState').style.display = 'none';
             const panel = document.getElementById('resultPanel');
@@ -420,16 +963,14 @@
 
             document.getElementById('resUsed').innerText = currentSolution.totalBins;
             document.getElementById('resWaste').innerText = currentSolution.totalWaste;
-            let totalTarget = demands.reduce((sum, d) => sum + (d.len * d.dem), 0);
-            let totalAvailable = currentSolution.patterns.reduce((sum, p) => sum + (p.stockLen * p.freq), 0);
-            document.getElementById('resRate').innerText = ((totalTarget / totalAvailable) * 100).toFixed(2);
+            document.getElementById('resRate').innerText = currentSolution.utilization.toFixed(2);
 
             let listHtml = '';
             currentSolution.patterns.forEach((p, idx) => {
                 let utilRate = ((p.usedLen / p.stockLen) * 100).toFixed(1);
                 let barColor = utilRate > 95 ? 'bg-[#34C759]' : (utilRate > 85 ? 'bg-[#007AFF]' : 'bg-[#FF9500]');
-                
-                let tagsHtml = p.items.map(item => 
+
+                let tagsHtml = p.items.map(item =>
                     `<span class="inline-block bg-[#F2F2F7] text-[#1D1D1F] px-2.5 py-1 rounded-[6px] text-[13px] font-medium border border-[rgba(0,0,0,0.03)] mr-1.5 mb-1.5">
                         ${item.len} <span class="text-[#86868B] mx-0.5">×</span> ${item.count}
                     </span>`
@@ -438,7 +979,7 @@
                 listHtml += `
                     <div id="list-card-${idx}" class="relative bg-white p-5 rounded-[20px] border border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
                          onmouseenter="highlightChart(${idx})" onmouseleave="downplayChart(${idx})">
-                        
+
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-2.5">
                                 <span class="bg-[#1D1D1F] text-white text-[12px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">P${idx + 1}</span>
@@ -462,61 +1003,65 @@
                     </div>
                 `;
             });
-            
+
             document.getElementById('aiAnalysis').innerHTML = listHtml;
             setTimeout(() => { renderDynamicChart(); }, 100);
+            showToast(`${getAlgoLabel()} 计算完成`, 'info');
         }
 
-        // --- ECharts 渲染更新 ---
         function renderDynamicChart() {
-            let pats = currentSolution.patterns; 
-            let uniqueLens =[...new Set(pats.flatMap(p => p.items.map(i => i.len)))].sort((a,b)=>b-a);
-            
-            const palette =['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#5856D6', '#5AC8FA'];
-            let colorMap = {}; uniqueLens.forEach((l, i) => colorMap[l] = palette[i % palette.length]);
+            let pats = currentSolution.patterns;
+            let uniqueLens = [...new Set(pats.flatMap(p => p.items.map(i => i.len)))].sort((a, b) => b - a);
+
+            const palette = ['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#5856D6', '#5AC8FA'];
+            let colorMap = {};
+            uniqueLens.forEach((l, i) => colorMap[l] = palette[i % palette.length]);
 
             let chartDom = document.getElementById('ganttChart');
-            
-            // 动态根据数据条数计算图表容器高度
+            let legendDom = document.getElementById('ganttLegend');
+
             let dynamicHeight = Math.max(600, pats.length * 75);
             chartDom.style.height = dynamicHeight + 'px';
 
             if (myChart) { myChart.dispose(); }
-            myChart = echarts.init(chartDom);
+            if (legendChart) { legendChart.dispose(); }
 
-            let seriesData =[];
-            
+            myChart = echarts.init(chartDom);
+            legendChart = echarts.init(legendDom);
+
+            let seriesData = [];
+
             uniqueLens.forEach(len => {
-                let dataArray =[];
-                pats.forEach(p => { 
-                    let item = p.items.find(i => i.len === len); 
-                    dataArray.push(item ? item.len * item.count : '-'); 
+                let dataArray = [];
+                pats.forEach(p => {
+                    let item = p.items.find(i => i.len === len);
+                    dataArray.push(item ? item.len * item.count : '-');
                 });
-                seriesData.push({ 
-                    name: `定尺:${len}`, 
-                    type: 'bar', 
-                    stack: 'total', 
-                    barWidth: 32, 
-                    itemStyle: { color: colorMap[len], borderRadius: [2, 2, 2, 2], borderColor: '#fff', borderWidth: 1.5 }, 
-                    data: dataArray 
+                seriesData.push({
+                    name: `定尺:${len}`,
+                    type: 'bar',
+                    stack: 'total',
+                    barWidth: 32,
+                    itemStyle: { color: colorMap[len], borderRadius: [2, 2, 2, 2], borderColor: '#fff', borderWidth: 1.5 },
+                    data: dataArray
                 });
             });
-            
-            seriesData.push({ 
-                name: '切缝与废料', 
-                type: 'bar', 
-                stack: 'total', 
+
+            seriesData.push({
+                name: '切缝与废料',
+                type: 'bar',
+                stack: 'total',
                 barWidth: 32,
-                itemStyle: { color: '#E5E5EA', borderRadius: [0, 8, 8, 0] }, 
-                data: pats.map(p => p.waste === 0 ? '-' : p.waste) 
+                itemStyle: { color: '#E5E5EA', borderRadius: [0, 8, 8, 0] },
+                data: pats.map(p => p.waste === 0 ? '-' : p.waste)
             });
 
             let maxStockUsed = Math.max(...pats.map(p => p.stockLen));
 
             const option = {
                 backgroundColor: 'transparent',
-                tooltip: { 
-                    trigger: 'axis', 
+                tooltip: {
+                    trigger: 'axis',
                     axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(0,122,255,0.04)' } },
                     backgroundColor: 'rgba(255,255,255,0.95)',
                     backdropFilter: 'blur(20px)',
@@ -524,7 +1069,7 @@
                     padding: 16,
                     textStyle: { color: '#1D1D1F' },
                     extraCssText: 'box-shadow: 0 10px 40px rgba(0,0,0,0.12); border-radius: 16px;',
-                    formatter: function(params) {
+                    formatter: function (params) {
                         let pat = pats[params[0].dataIndex];
                         return `
                             <div class="font-sans">
@@ -536,52 +1081,80 @@
                         `;
                     }
                 },
-                legend: { 
-                    data: uniqueLens.map(l => `定尺:${l}`).concat(['切缝与废料']), 
-                    bottom: 0,
-                    icon: 'circle',
-                    itemWidth: 12,
-                    textStyle: { color: '#86868B', fontFamily: '-apple-system', fontSize: 13 }
-                },
-                grid: { left: '3%', right: '5%', bottom: '40px', top: '20px', containLabel: true },
-                xAxis: { 
-                    type: 'value', 
+                legend: { show: false },
+                grid: { left: '3%', right: '5%', bottom: '20px', top: '20px', containLabel: true },
+                xAxis: {
+                    type: 'value',
                     max: maxStockUsed,
                     splitLine: { lineStyle: { color: '#F2F2F7', type: 'dashed' } },
                     axisLabel: { color: '#86868B', fontFamily: '-apple-system', fontSize: 12 },
                     axisLine: { show: false }
                 },
-                yAxis: { 
-                    type: 'category', 
-                    inverse: true, 
-                    data: pats.map((p,i) => `P${i+1}`), 
-                    axisLine: {show: false}, 
-                    axisTick: {show: false}, 
-                    axisLabel: { fontWeight: '600', fontSize: 14, color: '#1D1D1F', fontFamily: '-apple-system', margin: 16 } 
+                yAxis: {
+                    type: 'category',
+                    inverse: true,
+                    data: pats.map((p, i) => `P${i + 1}`),
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { fontWeight: '600', fontSize: 14, color: '#1D1D1F', fontFamily: '-apple-system', margin: 16 }
                 },
                 series: seriesData
             };
-            
-            myChart.setOption(option, true); 
+            myChart.setOption(option, true);
             myChart.resize();
-            
-            myChart.on('mouseover', function(params) {
+
+            const legendOption = {
+                legend: {
+                    data: uniqueLens.map(l => `定尺:${l}`).concat(['切缝与废料']),
+                    icon: 'circle',
+                    itemWidth: 12,
+                    textStyle: { color: '#86868B', fontFamily: '-apple-system', fontSize: 13 },
+                    type: 'scroll',
+                    pageIconColor: '#007AFF',
+                    top: 'center'
+                },
+                xAxis: { show: false, type: 'category' },
+                yAxis: { show: false, type: 'value' },
+                series: seriesData.map(s => ({
+                    name: s.name,
+                    type: 'bar',
+                    itemStyle: s.itemStyle,
+                    data: []
+                }))
+            };
+            legendChart.setOption(legendOption, true);
+            legendChart.resize();
+
+            legendChart.on('legendselectchanged', function (params) {
+                myChart.dispatchAction({ type: 'legendToggleSelect', name: params.name });
+            });
+            legendChart.on('highlight', function (params) {
+                myChart.dispatchAction({ type: 'highlight', seriesName: params.seriesName });
+            });
+            legendChart.on('downplay', function (params) {
+                myChart.dispatchAction({ type: 'downplay', seriesName: params.seriesName });
+            });
+
+            myChart.on('mouseover', function (params) {
                 let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
-                if(targetCard) {
+                if (targetCard) {
                     targetCard.classList.add('list-card-active');
                     targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             });
-            myChart.on('mouseout', function(params) {
+            myChart.on('mouseout', function (params) {
                 let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
-                if(targetCard) {
+                if (targetCard) {
                     targetCard.classList.remove('list-card-active');
                 }
             });
 
-            window.addEventListener('resize', () => myChart.resize());
+            window.addEventListener('resize', () => {
+                if (myChart) myChart.resize();
+                if (legendChart) legendChart.resize();
+            });
         }
     </script>
-</body>
 
+</body>
 </html>
