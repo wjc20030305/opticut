@@ -258,23 +258,33 @@
             const gaBtn = document.getElementById('algoGaBtn');
             if (!exactBtn || !gaBtn) return;
 
-            const activeCls = 'border-[#1D1D1F] bg-[#1D1D1F] text-white shadow-sm';
-            const inactiveCls = 'border-transparent bg-[#F2F2F7] text-[#1D1D1F] hover:border-[#007AFF] hover:bg-[#F0F7FF]';
+            // 弃用原来会导致全黑的代码，改用高亮蓝底蓝边框，解决黑底黑字看不见的问题
+            const activeCls = 'rounded-xl border px-3 py-3 text-left transition-all apple-btn border-[#007AFF] bg-[#F0F7FF] shadow-sm';
+            const inactiveCls = 'rounded-xl border px-3 py-3 text-left transition-all apple-btn border-transparent bg-[#F2F2F7] hover:border-[#007AFF] hover:bg-[#F0F7FF]';
 
             if (mode === 'exact') {
-                exactBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${activeCls}`;
-                gaBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${inactiveCls}`;
-                exactBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-white';
-                gaBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-[#1D1D1F]';
-                exactBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#E5E5E5]';
-                gaBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#86868B]';
+                exactBtn.className = activeCls;
+                gaBtn.className = inactiveCls;
+                
+                // 使用内联样式确保颜色强制生效，无需依赖 Tailwind CDN 运行时编译
+                exactBtn.querySelector('.text-[14px]').style.color = '#007AFF';
+                exactBtn.querySelector('.text-[12px]').style.color = '#007AFF';
+                exactBtn.querySelector('.text-[12px]').style.opacity = '0.8';
+
+                gaBtn.querySelector('.text-[14px]').style.color = '#1D1D1F';
+                gaBtn.querySelector('.text-[12px]').style.color = '#86868B';
+                gaBtn.querySelector('.text-[12px]').style.opacity = '1';
             } else {
-                gaBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${activeCls}`;
-                exactBtn.className = `rounded-xl border px-3 py-3 text-left transition-all apple-btn ${inactiveCls}`;
-                gaBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-white';
-                exactBtn.querySelector('.text-[14px]').className = 'text-[14px] font-semibold text-[#1D1D1F]';
-                gaBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#E5E5E5]';
-                exactBtn.querySelector('.text-[12px]').className = 'mt-0.5 text-[12px] text-[#86868B]';
+                gaBtn.className = activeCls;
+                exactBtn.className = inactiveCls;
+                
+                gaBtn.querySelector('.text-[14px]').style.color = '#007AFF';
+                gaBtn.querySelector('.text-[12px]').style.color = '#007AFF';
+                gaBtn.querySelector('.text-[12px]').style.opacity = '0.8';
+
+                exactBtn.querySelector('.text-[14px]').style.color = '#1D1D1F';
+                exactBtn.querySelector('.text-[12px]').style.color = '#86868B';
+                exactBtn.querySelector('.text-[12px]').style.opacity = '1';
             }
         }
 
