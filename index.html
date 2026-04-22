@@ -449,23 +449,22 @@
                 return;
             }
 
-            const ws_data = [["模式", "原材(mm)", "配方"]];
+            const ws_data = [["模式", "原材(mm)", "配方", "执行频次(次)"]];
 
             currentSolution.patterns.forEach((p, idx) => {
-                let modeStr = `P${idx + 1}`;
-                let rawLen = p.stockLen;
+                const modeStr = `P${idx + 1}`;
+                const rawLen = p.stockLen;
 
-                let comboStrParts = [];
-                p.items.forEach(item => {
-                    comboStrParts.push(`${item.len}mm × ${item.count}`);
-                });
-                let formulaStr = comboStrParts.join(' + ');
+                const formulaStr =
+                    (typeof p.comboStr === 'string' && p.comboStr.trim())
+                        ? p.comboStr
+                        : (p.items || []).map(item => `${item.len}mm × ${item.count}`).join(' + ');
 
-                ws_data.push([modeStr, rawLen, formulaStr]);
+                ws_data.push([modeStr, rawLen, formulaStr, (p && typeof p.freq === 'number') ? p.freq : 0]);
             });
 
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 50 }];
+            ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 50 }, { wch: 15 }];
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "方案明细");
