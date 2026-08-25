@@ -1,1179 +1,866 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RCOS | 智能钢筋下料</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <style>
-        /* 苹果系统级字体与抗锯齿渲染 */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #F5F5F7; 
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            color: #1D1D1F;
-        }
-        
-        /* 优雅的 macOS 风格滚动条 */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>首尔两日游 · 行程计划</title>
+<style>
+  :root {
+    --pink: #FFD6E0;
+    --pink-deep: #FFB3C6;
+    --mint: #C8F0E0;
+    --mint-deep: #A5E6CC;
+    --yellow: #FFF3C4;
+    --yellow-deep: #FFE88A;
+    --lavender: #E0D4FF;
+    --lavender-deep: #C8B6FF;
+    --sky: #CDE8FF;
+    --sky-deep: #A8D4FF;
+    --peach: #FFE0CC;
+    --bg: #FAF8F5;
+    --card: #FFFFFF;
+    --text: #2D2D2D;
+    --text-light: #8E8E93;
+    --text-lighter: #C7C7CC;
+    --border: #F0EDE8;
+    --shadow: 0 2px 16px rgba(0,0,0,0.04);
+    --shadow-hover: 0 4px 24px rgba(0,0,0,0.08);
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
 
-        /* 极柔和的阴影 */
-        .apple-shadow { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04); }
-        
-        /* 毛玻璃效果 */
-        .glass-header {
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* 输入框去边框化设计 */
-        .apple-input {
-            background-color: #F2F2F7;
-            border: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-        .apple-input:focus {
-            background-color: #FFFFFF;
-            border-color: #007AFF;
-            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
-            outline: none;
-        }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
 
-        .apple-btn:active { transform: scale(0.97); }
-        
-        /* 列表卡片激活态 */
-        .list-card-active {
-            border-color: #007AFF !important;
-            background-color: #F0F7FF !important;
-            box-shadow: 0 8px 24px rgba(0, 122, 255, 0.12) !important;
-            transform: scale(1.01);
-            z-index: 10;
-        }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
 
-        .scroll-list-padding { padding-bottom: 24px; }
-        
-        /* Toast 动画样式 */
-        .toast-enter { transform: translateY(-20px); opacity: 0; }
-        .toast-active { transform: translateY(0); opacity: 1; }
+  /* Progress bar */
+  .progress-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(250,248,245,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 12px 20px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--pink-deep), var(--lavender-deep), var(--sky-deep));
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-text {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 6px;
+    text-align: right;
+  }
 
-        /* 防止 iOS 聚焦输入框时自动放大页面 */
-        @media (max-width: 768px) {
-            input,
-            select,
-            textarea,
-            button {
-                font-size: 16px !important;
-            }
-        }
-    </style>
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 48px 0 32px;
+  }
+  .hero-tag {
+    display: inline-block;
+    padding: 6px 16px;
+    background: var(--pink);
+    color: #D46A8A;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+  .hero h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .hero .subtitle {
+    font-size: 16px;
+    color: var(--text-light);
+  }
+
+  /* Info cards */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+  .info-card {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    padding: 16px 14px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .info-card .icon { font-size: 22px; margin-bottom: 6px; }
+  .info-card .label { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
+  .info-card .value { font-size: 14px; font-weight: 600; }
+
+  /* Section */
+  .day-section { margin-bottom: 40px; }
+  .day-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .day-badge {
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .day-badge.d1 { background: linear-gradient(135deg, var(--pink-deep), var(--lavender-deep)); }
+  .day-badge.d2 { background: linear-gradient(135deg, var(--mint-deep), var(--sky-deep)); }
+  .day-title { font-size: 18px; font-weight: 600; }
+  .day-route { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--border);
+    border-radius: 1px;
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 22px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 2px solid var(--lavender-deep);
+    z-index: 1;
+  }
+  .timeline-item.mint::before { border-color: var(--mint-deep); }
+  .timeline-item.yellow::before { border-color: var(--yellow-deep); }
+  .timeline-item.pink::before { border-color: var(--pink-deep); }
+  .timeline-item.sky::before { border-color: var(--sky-deep); }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    cursor: pointer;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .card:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+  .card.done { opacity: 0.55; }
+  .card.done .card-title { text-decoration: line-through; }
+
+  .checkbox {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--text-lighter);
+    border-radius: 50%;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .card.done .checkbox {
+    background: var(--mint-deep);
+    border-color: var(--mint-deep);
+  }
+  .card.done .checkbox::after {
+    content: '✓';
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .card-body { flex: 1; min-width: 0; }
+  .card-time {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .card-desc {
+    font-size: 14px;
+    color: var(--text-light);
+    line-height: 1.65;
+  }
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .tag {
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tag.pink { background: var(--pink); color: #C45A7A; }
+  .tag.mint { background: var(--mint); color: #3A9A7A; }
+  .tag.yellow { background: var(--yellow); color: #B8860B; }
+  .tag.lavender { background: var(--lavender); color: #7B5EA7; }
+  .tag.sky { background: var(--sky); color: #4A8AC4; }
+  .tag.peach { background: var(--peach); color: #C47A4A; }
+
+  /* Highlight block */
+  .highlight-block {
+    background: linear-gradient(135deg, var(--lavender), var(--sky));
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .highlight-block h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .highlight-block .hl-sub {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 16px;
+  }
+
+  .tax-step {
+    background: rgba(255,255,255,0.7);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(10px);
+  }
+  .tax-step:last-child { margin-bottom: 0; }
+  .tax-step .step-time {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7B5EA7;
+    margin-bottom: 4px;
+  }
+  .tax-step .step-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .tax-step .step-desc {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.6;
+  }
+  .tax-step .warn {
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: var(--yellow);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #8B6914;
+  }
+
+  /* Night section */
+  .night-block {
+    background: linear-gradient(135deg, var(--lavender), var(--pink));
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .night-block h3 { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+
+  /* Notes */
+  .notes-block {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .notes-block h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .notes-list { list-style: none; }
+  .notes-list li {
+    font-size: 14px;
+    color: var(--text-light);
+    padding: 8px 0;
+    padding-left: 20px;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.6;
+  }
+  .notes-list li:last-child { border-bottom: none; }
+  .notes-list li::before {
+    content: '•';
+    position: absolute;
+    left: 4px;
+    color: var(--lavender-deep);
+    font-weight: 700;
+  }
+
+  /* Backup */
+  .backup-block {
+    background: var(--yellow);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .backup-block h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #8B6914; }
+  .backup-block p { font-size: 14px; color: #6B5A14; line-height: 1.6; }
+
+  .footer {
+    text-align: center;
+    padding: 30px 0 20px;
+    font-size: 14px;
+    color: var(--text-light);
+  }
+
+  @media (max-width: 480px) {
+    .hero h1 { font-size: 28px; }
+    .info-grid { grid-template-columns: 1fr; }
+    .container { padding: 0 16px 40px; }
+    .card { padding: 16px; }
+  }
+</style>
 </head>
-<body class="min-h-screen md:h-screen flex flex-col overflow-x-hidden md:overflow-x-auto overflow-y-auto md:overflow-y-hidden min-w-0 md:min-w-[1024px]">
+<body>
 
-    <header class="glass-header px-4 md:px-6 py-3 md:py-4 flex justify-between items-center shrink-0 z-20">
-        <div class="flex items-center gap-3">
-            <div class="bg-[#007AFF] p-1.5 rounded-lg text-white shadow-sm">
-                <i data-feather="layers" class="w-5 h-5"></i>
-            </div>
-            <div>
-                <h1 class="text-[15px] md:text-[17px] font-semibold tracking-tight text-[#1D1D1F]">RCOS 智能决策工作台</h1>
-                <p class="text-[10px] md:text-[11px] font-medium text-[#86868B] tracking-wide uppercase mt-0.5">Multi-stock 1D-CSP Optimizer</p>
-            </div>
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-text" id="progressText">0 / 0 已完成</div>
+</div>
+
+<div class="container">
+
+  <div class="hero">
+    <div class="hero-tag">✈️ SEOUL TRIP</div>
+    <h1>首尔两日游</h1>
+    <div class="subtitle">8月28日 — 8月29日 · 东大门住宿 · 退税零延误方案</div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="icon">✈️</div>
+      <div class="label">返程航班</div>
+      <div class="value">08:35 起飞</div>
+    </div>
+    <div class="info-card">
+      <div class="icon">🏨</div>
+      <div class="label">住宿</div>
+      <div class="value">天空花园东大门</div>
+    </div>
+    <div class="info-card">
+      <div class="icon">🚌</div>
+      <div class="label">返程交通</div>
+      <div class="value">6001路 04:35</div>
+    </div>
+  </div>
+
+  <!-- DAY 1 -->
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-badge d1">DAY 1</div>
+      <div>
+        <div class="day-title">8月28日 周五 · 抵达日</div>
+        <div class="day-route">AREX入境 → 广藏市场 → 圣水洞 → 明洞</div>
+      </div>
+    </div>
+    <div class="timeline" id="day1">
+
+      <div class="timeline-item pink">
+        <div class="card" data-id="d1-1">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">05:30</div>
+            <div class="card-title">抵达仁川国际机场</div>
+            <div class="card-desc">跟随指示牌到入境大厅，完成入境审查、提取行李，全程约1小时。</div>
+            <div class="card-tags"><span class="tag pink">入境</span></div>
+          </div>
         </div>
-    </header>
+      </div>
 
-    <main class="flex-grow flex flex-col md:flex-row overflow-visible md:overflow-hidden">
-        
-        <aside class="w-full md:w-[400px] bg-[#F5F5F7] flex flex-col shrink-0 overflow-y-visible md:overflow-y-auto z-10 p-4 md:p-5 gap-4 md:gap-5 md:border-r border-[rgba(0,0,0,0.05)]">
-            
-            <section class="bg-white rounded-[20px] p-5 apple-shadow">
-                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-                    <i data-feather="settings" class="w-4 h-4 text-[#86868B]"></i> 工艺约束
-                </h2>
-                <div class="flex items-center justify-between">
-                    <label class="text-[14px] text-[#515154]">锯片切缝损耗 Δ</label>
-                    <div class="flex items-center gap-2">
-                        <input id="kerf" type="number" min="0" value="5" class="apple-input w-20 text-center rounded-xl p-2 text-[15px] font-medium text-[#1D1D1F]">
-                        <span class="text-[13px] text-[#86868B]">mm</span>
-                    </div>
-                </div>
-            </section>
+      <div class="timeline-item lavender">
+        <div class="card" data-id="d1-2">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">06:30</div>
+            <div class="card-title">乘坐 AREX 机场快线直达列车</div>
+            <div class="card-desc">前往B1层交通中心。直达列车中途不停站，到首尔站仅需43分钟，票价13000韩元/人，可在自助机用现金/交通卡购买，班次间隔约25-40分钟。<br><strong>注意：</strong>直达列车为橙色标识，普通列车为蓝色标识（停站多、耗时久），不要坐错。</div>
+            <div class="card-tags"><span class="tag lavender">交通</span><span class="tag yellow">⚠️ 别坐错</span></div>
+          </div>
+        </div>
+      </div>
 
+      <div class="timeline-item sky">
+        <div class="card" data-id="d1-3">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">07:13</div>
+            <div class="card-title">到达首尔站 → 换乘地铁</div>
+            <div class="card-desc">站内换乘地铁1号线（清凉里方向），2站约5分钟直达东大门站，从酒店附近出口出站。</div>
+            <div class="card-tags"><span class="tag sky">地铁</span></div>
+          </div>
+        </div>
+      </div>
 
-            <section class="bg-white rounded-[20px] p-5 apple-shadow">
-                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-                    <i data-feather="cpu" class="w-4 h-4 text-[#FF9500]"></i> 算法选择
-                </h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="algoExactBtn" onclick="setAlgorithmMode('exact')" class="rounded-xl border border-transparent bg-[#F2F2F7] px-3 py-3 text-left transition-all apple-btn hover:border-[#007AFF] hover:bg-[#F0F7FF]">
-                        <div class="text-[14px] font-semibold text-[#1D1D1F]">精确算法</div>
-                        <div class="mt-0.5 text-[12px] text-[#86868B]">适用于小批量</div>
-                    </button>
-                    <button id="algoGaBtn" onclick="setAlgorithmMode('ga')" class="rounded-xl border border-transparent bg-[#F2F2F7] px-3 py-3 text-left transition-all apple-btn hover:border-[#007AFF] hover:bg-[#F0F7FF]">
-                        <div class="text-[14px] font-semibold text-[#1D1D1F]">遗传算法</div>
-                        <div class="mt-0.5 text-[12px] text-[#86868B]">适用于大批量</div>
-                    </button>
-                </div>
-                <p class="mt-3 text-[12px] leading-relaxed text-[#86868B]">
-                    小规模订单建议使用精确算法以获得最优整数解；大规模订单建议使用遗传算法以提高计算效率。
-                </p>
-            </section>
+      <div class="timeline-item mint">
+        <div class="card" data-id="d1-4">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">07:30</div>
+            <div class="card-title">到达首尔天空花园东大门一号酒店</div>
+            <div class="card-desc">常规入住时间为14:00后，前台免费寄存大件行李，轻装出门。</div>
+            <div class="card-tags"><span class="tag mint">酒店</span><span class="tag peach">寄存行李</span></div>
+          </div>
+        </div>
+      </div>
 
-            <section class="bg-white rounded-[20px] p-5 apple-shadow flex flex-col max-h-[300px]">
-                <h2 class="text-[15px] font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-                    <i data-feather="package" class="w-4 h-4 text-[#34C759]"></i> 仓库可用原材
-                </h2>
-                <div class="flex gap-2 mb-4">
-                    <input id="newStockLen" type="number" min="1" placeholder="长度 (mm)" class="apple-input w-[40%] rounded-xl p-2.5 text-[14px]">
-                    <input id="newStockInv" type="number" min="1" placeholder="库存量" class="apple-input w-[35%] rounded-xl p-2.5 text-[14px]">
-                    <button onclick="addStock()" class="w-[25%] bg-[#34C759] text-white rounded-xl text-[14px] font-medium hover:bg-[#32B353] transition-colors apple-btn">录入</button>
-                </div>
-                <div class="flex-grow overflow-hidden flex flex-col">
-                    <div class="text-[12px] font-medium text-[#86868B] grid grid-cols-3 pb-2 text-center border-b border-gray-100">
-                        <div>规格(mm)</div><div>库存(根)</div><div>操作</div>
-                    </div>
-                    <div id="stockBody" class="overflow-y-auto text-[14px] pt-1"></div>
-                </div>
-            </section>
+      <div class="timeline-item yellow">
+        <div class="card" data-id="d1-5">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">08:00</div>
+            <div class="card-title">早餐：名人先农汤广藏市场店</div>
+            <div class="card-desc">从酒店步行12分钟可达，热牛骨汤配米饭，暖胃解乏，落地第一餐非常合适。</div>
+            <div class="card-tags"><span class="tag yellow">早餐</span><span class="tag pink">美食</span></div>
+          </div>
+        </div>
+      </div>
 
-            <section class="bg-white rounded-[20px] p-5 apple-shadow flex-grow flex flex-col">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-[15px] font-semibold text-[#1D1D1F] flex items-center gap-2">
-                        <i data-feather="list" class="w-4 h-4 text-[#007AFF]"></i> 目标需求定尺
-                    </h2>
-                    <label class="cursor-pointer text-[13px] text-[#007AFF] hover:text-[#005bb5] font-medium transition-colors">
-                        导入 Excel
-                        <input type="file" id="excelFile" class="hidden" accept=".xlsx, .xls, .csv" onchange="importExcel()">
-                    </label>
-                </div>
-                <div class="flex gap-2 mb-4">
-                    <input id="newLen" type="number" min="1" placeholder="规格 (mm)" class="apple-input w-[40%] rounded-xl p-2.5 text-[14px]">
-                    <input id="newDem" type="number" min="1" placeholder="需求量" class="apple-input w-[35%] rounded-xl p-2.5 text-[14px]">
-                    <button onclick="addRow()" class="w-[25%] bg-[#007AFF] text-white rounded-xl text-[14px] font-medium hover:bg-[#0062cc] transition-colors apple-btn">加单</button>
-                </div>
-                <div class="flex-grow overflow-hidden flex flex-col">
-                    <div class="text-[12px] font-medium text-[#86868B] grid grid-cols-3 pb-2 text-center border-b border-gray-100">
-                        <div>定尺(mm)</div><div>需求(根)</div><div>操作</div>
-                    </div>
-                    <div id="demandBody" class="overflow-y-auto text-[14px] pt-1 min-h-[100px]"></div>
-                </div>
-            </section>
+      <div class="timeline-item pink">
+        <div class="card" data-id="d1-6">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">09:00</div>
+            <div class="card-title">浅逛广藏市场</div>
+            <div class="card-desc">上午游客少烟火气足，尝绿豆煎饼、麻药紫菜包饭等小吃即可，不用吃太饱。</div>
+            <div class="card-tags"><span class="tag pink">逛吃</span></div>
+          </div>
+        </div>
+      </div>
 
-            <button onclick="runOptimization()" class="w-full bg-[#1D1D1F] text-white py-4 rounded-[18px] font-semibold text-[16px] apple-shadow hover:bg-[#000000] transition-all apple-btn flex justify-center items-center gap-2 mt-auto shrink-0">
-                <i data-feather="play" class="w-4 h-4 fill-current"></i> 启动智能排产
-            </button>
-        </aside>
+      <div class="timeline-item sky">
+        <div class="card" data-id="d1-7">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">10:00</div>
+            <div class="card-title">出发前往圣水洞</div>
+            <div class="card-desc">东大门站坐地铁2号线（圣水方向），3站约10分钟直达圣水站。</div>
+            <div class="card-tags"><span class="tag sky">地铁</span></div>
+          </div>
+        </div>
+      </div>
 
-        <section class="flex-grow p-4 md:p-8 overflow-visible md:overflow-hidden relative bg-[#F5F5F7] min-h-[65vh] md:min-h-0">
-            
-            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-[#86868B] transition-opacity duration-300 z-10">
-                <div class="bg-white p-6 rounded-[28px] apple-shadow mb-4">
-                    <i data-feather="cpu" class="w-12 h-12 text-[#007AFF] opacity-80"></i>
-                </div>
-                <h3 class="text-[17px] font-medium text-[#1D1D1F]">等待算法引擎演算</h3>
-                <p class="text-[14px] mt-1">请在左侧配置参数并点击启动</p>
+      <div class="timeline-item mint">
+        <div class="card" data-id="d1-8">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">10:30 — 15:00</div>
+            <div class="card-title">圣水洞慢逛</div>
+            <div class="card-desc">店铺大多11点后陆续开门，节奏放慢：独栋潮牌买手店、设计师服饰、文创杂货、颜值咖啡馆慢慢打卡。午饭在圣水洞解决，可选韩式创意料理、手工汉堡或意式餐吧。</div>
+            <div class="card-tags"><span class="tag mint">逛街</span><span class="tag yellow">午饭</span><span class="tag lavender">咖啡</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item sky">
+        <div class="card" data-id="d1-9">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">15:00</div>
+            <div class="card-title">出发前往明洞</div>
+            <div class="card-desc">圣水站坐地铁2号线转4号线，约20分钟直达明洞。</div>
+            <div class="card-tags"><span class="tag sky">地铁</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item pink">
+        <div class="card" data-id="d1-10">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">15:30 — 21:30</div>
+            <div class="card-title">明洞逛街 + 晚餐</div>
+            <div class="card-desc">逛 Olive Young、彩妆专柜、服饰配饰店，明洞圣堂顺路打卡。晚饭选部队火锅、韩式炸酱面、烤肠炸鸡都可，夜间街头氛围更好。</div>
+            <div class="card-tags"><span class="tag pink">购物</span><span class="tag yellow">晚餐</span><span class="tag mint">打卡</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item lavender">
+        <div class="card" data-id="d1-11">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">22:00</div>
+            <div class="card-title">返回东大门酒店，办理入住</div>
+            <div class="card-desc">回酒店办理入住后尽早休息，为第二天养精蓄锐。</div>
+            <div class="card-tags"><span class="tag lavender">休息</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DAY 2 -->
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-badge d2">DAY 2</div>
+      <div>
+        <div class="day-title">8月29日 周六 · 游玩 + 返程</div>
+        <div class="day-route">弘大 → 延南洞 → 烤肉 → 东大门汗蒸幕 → 机场</div>
+      </div>
+    </div>
+    <div class="timeline" id="day2">
+
+      <div class="timeline-item mint">
+        <div class="card" data-id="d2-1">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">09:30</div>
+            <div class="card-title">起床，酒店周边吃简餐</div>
+            <div class="card-tags"><span class="tag mint">早餐</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item peach">
+        <div class="card" data-id="d2-2">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">10:30</div>
+            <div class="card-title">办理退房，寄存大件行李</div>
+            <div class="card-desc">大件行李免费寄存在酒店前台，轻装出门。</div>
+            <div class="card-tags"><span class="tag peach">退房</span><span class="tag yellow">寄存行李</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item sky">
+        <div class="card" data-id="d2-3">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">11:00</div>
+            <div class="card-title">出发前往弘大</div>
+            <div class="card-desc">东大门站坐地铁2号线直达弘益大学站，约35分钟。</div>
+            <div class="card-tags"><span class="tag sky">地铁</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item pink">
+        <div class="card" data-id="d2-4">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">11:30 — 13:30</div>
+            <div class="card-title">弘大主街区逛买 + 午饭</div>
+            <div class="card-desc">逛潮牌店、球鞋店、文创小店，周六白天常有街头公演。午饭选辣炒鸡爪、芝士排骨或韩式炸猪排。</div>
+            <div class="card-tags"><span class="tag pink">逛街</span><span class="tag yellow">午饭</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item mint">
+        <div class="card" data-id="d2-5">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">13:30</div>
+            <div class="card-title">步行前往延南洞</div>
+            <div class="card-desc">约10分钟路程。</div>
+            <div class="card-tags"><span class="tag mint">步行</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item lavender">
+        <div class="card" data-id="d2-6">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">14:00</div>
+            <div class="card-title">朋友到 Syuneeku 延南美容院剪发</div>
+            <div class="card-desc">利用这1-2小时逛延南洞中央公园周边的小众咖啡馆、面包店、文具杂货铺，逛累了找家店歇脚，节奏轻松。</div>
+            <div class="card-tags"><span class="tag lavender">剪发</span><span class="tag pink">咖啡馆</span><span class="tag mint">自由活动</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item pink">
+        <div class="card" data-id="d2-7">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">16:00</div>
+            <div class="card-title">两人汇合，返回弘大补逛</div>
+            <div class="card-desc">补逛没逛完的店铺即可。</div>
+            <div class="card-tags"><span class="tag pink">逛街</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item yellow">
+        <div class="card" data-id="d2-8">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">18:30</div>
+            <div class="card-title">晚餐：宇宙家弘大总店</div>
+            <div class="card-desc">就在弘大片区内步行可达，周六晚可能排队，建议18:20左右到店。</div>
+            <div class="card-tags"><span class="tag yellow">晚餐</span><span class="tag pink">烤肉</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item sky">
+        <div class="card" data-id="d2-9">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">20:00</div>
+            <div class="card-title">结束晚餐，返回东大门</div>
+            <div class="card-desc">坐地铁2号线返回东大门。</div>
+            <div class="card-tags"><span class="tag sky">地铁</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item peach">
+        <div class="card" data-id="d2-10">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">20:40</div>
+            <div class="card-title">回到东大门，回酒店取大件行李</div>
+            <div class="card-desc">后续休息和交通都围绕东大门展开，不用折返。</div>
+            <div class="card-tags"><span class="tag peach">取行李</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Night rest -->
+    <div class="night-block" style="margin-top: 20px;">
+      <h3>🌙 夜间休息安排（以躺平休整为主）</h3>
+      <div class="timeline" style="padding-left: 28px;">
+        <div class="timeline-item lavender">
+          <div class="card" data-id="d2-11" style="background: rgba(255,255,255,0.6);">
+            <div class="checkbox"></div>
+            <div class="card-body">
+              <div class="card-time">21:10</div>
+              <div class="card-title">东大门 SPAREX 汗蒸幕（24小时营业）</div>
+              <div class="card-desc">步行5分钟可达。场内支持大件行李寄存，进场后先洗澡泡汤，再蒸汗蒸缓解疲劳，休息大厅有地暖软垫可以躺平睡觉，还有24小时餐厅提供烤鸡蛋、甜米露、拉面等夜宵。<br><br>
+              <strong>费用：</strong>夜间入场约16000韩元/人，行李寄存额外约4000韩元。<br>
+              <strong>备选：</strong>若不想汗蒸，可找东大门周边24小时咖啡馆坐着休息，但舒适度远不如汗蒸幕。</div>
+              <div class="card-tags"><span class="tag lavender">汗蒸幕</span><span class="tag mint">休息</span><span class="tag yellow">24小时</span></div>
             </div>
-
-            <div id="resultPanel" class="hidden flex flex-col md:h-full gap-4 md:gap-6 max-w-[1600px] mx-auto opacity-0 transition-opacity duration-500">
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="layers" class="w-20 h-20 text-[#007AFF]"></i></div>
-                        <p class="text-[14px] font-medium text-[#86868B] mb-2">实际消耗原材(根)</p>
-                        <h3 class="text-[40px] font-bold text-[#1D1D1F] leading-none" id="resUsed">0 <span class="text-[16px] font-medium text-[#86868B]">根</span></h3>
-                    </div>
-                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="scissors" class="w-20 h-20 text-[#FF3B30]"></i></div>
-                        <p class="text-[14px] font-medium text-[#86868B] mb-2">产生废料总计(mm)</p>
-                        <h3 class="text-[40px] font-bold text-[#FF3B30] leading-none" id="resWaste">0 <span class="text-[16px] font-medium text-[#FF8682]">mm</span></h3>
-                    </div>
-                    <div class="bg-white p-6 rounded-[24px] apple-shadow relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-6 opacity-5"><i data-feather="pie-chart" class="w-20 h-20 text-[#34C759]"></i></div>
-                        <p class="text-[14px] font-medium text-[#86868B] mb-2">材料综合利用率</p>
-                        <h3 class="text-[40px] font-bold text-[#34C759] leading-none" id="resRate">0.00 <span class="text-[20px] font-medium text-[#8EE0A1]">%</span></h3>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 xl:grid-cols-5 gap-4 md:gap-6 flex-grow overflow-visible md:overflow-hidden pb-4">
-                    
-                    <div class="xl:col-span-2 bg-white rounded-[28px] apple-shadow flex flex-col overflow-hidden relative min-h-[360px] md:min-h-0">
-                        <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 bg-white/95 backdrop-blur z-20 shadow-sm flex justify-between items-center">
-                            <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
-                                <div class="w-1.5 h-5 bg-[#007AFF] rounded-full"></div> 方案执行明细
-                            </h3>
-                            <!-- 修复点 3：新增 Excel 导出按钮 -->
-                            <button onclick="exportResultExcel()" class="bg-[#007AFF] text-white px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-[#0062cc] transition-colors apple-btn flex items-center gap-1.5">
-                                <i data-feather="download" class="w-3.5 h-3.5"></i> 导出Excel
-                            </button>
-                        </div>
-                        <div id="aiAnalysis" class="flex-grow overflow-y-auto p-5 space-y-4 bg-[#F9F9FB] scroll-list-padding">
-                        </div>
-                    </div>
-
-                    <!-- 修复点 1：为外层容器增加 relative 和底部内边距，容纳绝对定位的图例 -->
-                    <div class="xl:col-span-3 bg-white flex flex-col rounded-[28px] apple-shadow overflow-hidden relative pb-[40px] min-h-[420px] md:min-h-0">
-                        <div class="p-6 pb-4 border-b border-[#F2F2F7] shrink-0 z-20 shadow-sm flex justify-between items-center">
-                            <h3 class="text-[17px] font-semibold text-[#1D1D1F] flex items-center gap-2">
-                                <div class="w-1.5 h-5 bg-[#5E5CE6] rounded-full"></div> 全局排样映射图
-                            </h3>
-                            <span class="text-[12px] font-medium text-[#86868B] bg-[#F2F2F7] px-2.5 py-1 rounded-lg">展示所有切割配方</span>
-                        </div>
-                        
-                        <div id="chartScrollContainer" class="flex-grow overflow-y-auto relative bg-[#FCFCFC] p-4">
-                            <div id="ganttChart" class="w-full"></div>
-                        </div>
-                        <!-- 修复点 1：固定在底部的图例容器 -->
-                        <div id="fixedLegendContainer" class="absolute bottom-0 left-0 w-full h-[40px] bg-white/90 backdrop-blur border-t border-[#F2F2F7] flex justify-center items-center z-10 pointer-events-none">
-                            <div id="ganttLegend" class="w-full h-full pointer-events-auto"></div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <div id="toastContainer" class="fixed top-4 inset-x-0 z-50 flex flex-col items-center pointer-events-none gap-2"></div>
-
-    
-    <script>
-        feather.replace();
-
-        let myChart = null;
-        let legendChart = null;
-
-        let stocks = [{ len: 12000, inv: 200 }];
-        let demands = [
-            { len: 5800, dem: 45 }, { len: 4200, dem: 60 }, { len: 3500, dem: 80 },
-            { len: 2800, dem: 55 }, { len: 2100, dem: 110 }, { len: 1500, dem: 140 }
-        ];
-        let currentSolution = null;
-        let selectedAlgorithm = 'ga';
-
-        renderStocks();
-        renderTable();
-        setAlgorithmMode('ga');
-
-        function setAlgorithmMode(mode) {
-            selectedAlgorithm = mode;
-            const exactBtn = document.getElementById('algoExactBtn');
-            const gaBtn = document.getElementById('algoGaBtn');
-            if (!exactBtn || !gaBtn) return;
-
-            // 弃用原来会导致全黑的代码，改用高亮蓝底蓝边框，解决黑底黑字看不见的问题
-            const activeCls = 'rounded-xl border px-3 py-3 text-left transition-all apple-btn border-[#007AFF] bg-[#F0F7FF] shadow-sm';
-            const inactiveCls = 'rounded-xl border px-3 py-3 text-left transition-all apple-btn border-transparent bg-[#F2F2F7] hover:border-[#007AFF] hover:bg-[#F0F7FF]';
-
-            if (mode === 'exact') {
-                exactBtn.className = activeCls;
-                gaBtn.className = inactiveCls;
-                
-                // 使用内联样式确保颜色强制生效，无需依赖 Tailwind CDN 运行时编译
-                exactBtn.querySelector('.text-[14px]').style.color = '#007AFF';
-                exactBtn.querySelector('.text-[12px]').style.color = '#007AFF';
-                exactBtn.querySelector('.text-[12px]').style.opacity = '0.8';
-
-                gaBtn.querySelector('.text-[14px]').style.color = '#1D1D1F';
-                gaBtn.querySelector('.text-[12px]').style.color = '#86868B';
-                gaBtn.querySelector('.text-[12px]').style.opacity = '1';
-            } else {
-                gaBtn.className = activeCls;
-                exactBtn.className = inactiveCls;
-                
-                gaBtn.querySelector('.text-[14px]').style.color = '#007AFF';
-                gaBtn.querySelector('.text-[12px]').style.color = '#007AFF';
-                gaBtn.querySelector('.text-[12px]').style.opacity = '0.8';
-
-                exactBtn.querySelector('.text-[14px]').style.color = '#1D1D1F';
-                exactBtn.querySelector('.text-[12px]').style.color = '#86868B';
-                exactBtn.querySelector('.text-[12px]').style.opacity = '1';
-            }
-        }
-
-        function showToast(message, type = 'warning') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-
-            const colorClass = type === 'error' || type === 'warning' ? 'text-[#FF3B30]' : 'text-[#007AFF]';
-            const iconName = type === 'error' || type === 'warning' ? 'alert-circle' : 'info';
-
-            toast.className = `flex items-center gap-2 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-[rgba(0,0,0,0.05)] text-[14px] font-medium text-[#1D1D1F] transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] toast-enter`;
-            toast.innerHTML = `<i data-feather="${iconName}" class="w-5 h-5 ${colorClass}"></i> <span>${message}</span>`;
-
-            container.appendChild(toast);
-            feather.replace();
-
-            requestAnimationFrame(() => {
-                toast.classList.remove('toast-enter');
-                toast.classList.add('toast-active');
-            });
-
-            setTimeout(() => {
-                toast.classList.remove('toast-active');
-                toast.classList.add('toast-enter');
-                setTimeout(() => toast.remove(), 400);
-            }, 3000);
-        }
-
-        function renderStocks() {
-            let html = '';
-            stocks.forEach((item, i) => html += `
-                <div class="grid grid-cols-3 py-2.5 text-center border-b border-gray-50 hover:bg-[#F9F9FB] rounded-lg transition-colors group">
-                    <div class="font-semibold text-[#34C759]">${item.len}</div>
-                    <div class="text-[#1D1D1F]">${item.inv}</div>
-                    <div>
-                        <button onclick="stocks.splice(${i},1);renderStocks()" class="text-[#86868B] hover:text-[#FF3B30] opacity-0 group-hover:opacity-100 transition-all">
-                            <i data-feather="minus-circle" class="w-4 h-4 mx-auto"></i>
-                        </button>
-                    </div>
-                </div>`);
-            document.getElementById('stockBody').innerHTML = html;
-            feather.replace();
-        }
-
-        function addStock() {
-            let l = Number(document.getElementById('newStockLen').value);
-            let i = Number(document.getElementById('newStockInv').value);
-
-            if (!l || !i || l <= 0 || i <= 0 || !Number.isInteger(l) || !Number.isInteger(i)) {
-                return showToast('请输入大于 0 的有效整数', 'warning');
-            }
-
-            stocks.push({ len: l, inv: i });
-            renderStocks();
-            document.getElementById('newStockLen').value = '';
-            document.getElementById('newStockInv').value = '';
-            showToast('录入成功', 'info');
-        }
-
-        function renderTable() {
-            let html = '';
-            demands.forEach((item, i) => html += `
-                <div class="grid grid-cols-3 py-2.5 text-center border-b border-gray-50 hover:bg-[#F9F9FB] rounded-lg transition-colors group">
-                    <div class="font-medium text-[#007AFF]">${item.len}</div>
-                    <div class="text-[#1D1D1F]">${item.dem}</div>
-                    <div>
-                        <button onclick="demands.splice(${i},1);renderTable()" class="text-[#86868B] hover:text-[#FF3B30] opacity-0 group-hover:opacity-100 transition-all">
-                            <i data-feather="minus-circle" class="w-4 h-4 mx-auto"></i>
-                        </button>
-                    </div>
-                </div>`);
-            document.getElementById('demandBody').innerHTML = html;
-            feather.replace();
-        }
-
-        function addRow() {
-            let l = Number(document.getElementById('newLen').value);
-            let d = Number(document.getElementById('newDem').value);
-
-            if (!l || !d || l <= 0 || d <= 0 || !Number.isInteger(l) || !Number.isInteger(d)) {
-                return showToast('请输入大于 0 的有效整数', 'warning');
-            }
-
-            demands.unshift({ len: l, dem: d });
-            renderTable();
-            document.getElementById('newLen').value = '';
-            document.getElementById('newDem').value = '';
-            showToast('加单成功', 'info');
-        }
-
-        function importExcel() {
-            const fileInput = document.getElementById('excelFile');
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    if (!json || json.length < 2) {
-                        showToast('Excel解析失败，请检查格式', 'error');
-                        return;
-                    }
-
-                    let headers = json[0].map(h => String(h).trim());
-                    let lenIdx = headers.findIndex(h => h.includes('定尺') || h.includes('length') || h.includes('规格'));
-                    let demIdx = headers.findIndex(h => h.includes('需求') || h.includes('demand') || h.includes('数量'));
-
-                    if (lenIdx === -1 || demIdx === -1) {
-                        showToast('Excel解析失败，请检查格式', 'error');
-                        return;
-                    }
-
-                    let addedCount = 0;
-                    for (let i = 1; i < json.length; i++) {
-                        let row = json[i];
-                        if (!row || row[lenIdx] === undefined || row[demIdx] === undefined) continue;
-
-                        let l = Number(row[lenIdx]);
-                        let d = Number(row[demIdx]);
-
-                        if (l > 0 && d > 0 && Number.isInteger(l) && Number.isInteger(d)) {
-                            demands.push({ len: l, dem: d });
-                            addedCount++;
-                        }
-                    }
-
-                    if (addedCount > 0) {
-                        renderTable();
-                        showToast(`Excel导入成功，新增${addedCount}条数据`, 'info');
-                    } else {
-                        showToast('Excel解析失败，请检查格式', 'error');
-                    }
-
-                } catch (err) {
-                    showToast('Excel解析失败，请检查格式', 'error');
-                } finally {
-                    fileInput.value = '';
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function exportResultExcel() {
-            if (!currentSolution || !currentSolution.patterns || currentSolution.patterns.length === 0) {
-                showToast('暂无方案数据可导出', 'warning');
-                return;
-            }
-
-            const ws_data = [["模式", "原材(mm)", "配方", "执行频次(次)"]];
-
-            currentSolution.patterns.forEach((p, idx) => {
-                const modeStr = `P${idx + 1}`;
-                const rawLen = p.stockLen;
-
-                const formulaStr =
-                    (typeof p.comboStr === 'string' && p.comboStr.trim())
-                        ? p.comboStr
-                        : (p.items || []).map(item => `${item.len}mm × ${item.count}`).join(' + ');
-
-                ws_data.push([modeStr, rawLen, formulaStr, (p && typeof p.freq === 'number') ? p.freq : 0]);
-            });
-
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 50 }, { wch: 15 }];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "方案明细");
-
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
-
-            const filename = `钢筋下料方案_${timestamp}.xlsx`;
-            XLSX.writeFile(wb, filename);
-            showToast('方案已导出为Excel', 'info');
-        }
-
-        function getAlgoLabel() {
-            return selectedAlgorithm === 'exact' ? '精确算法' : '遗传算法';
-        }
-
-        function expandDemands(reqs) {
-            const items = [];
-            reqs.forEach((r, ridx) => {
-                for (let i = 0; i < r.dem; i++) {
-                    items.push({ id: `${ridx}_${i}_${r.len}`, len: Number(r.len) });
-                }
-            });
-            return items;
-        }
-
-        function cloneStocks(list) {
-            return list.map(s => ({ len: Number(s.len), inv: Number(s.inv) }));
-        }
-
-        function cloneBins(bins) {
-            return bins.map(b => ({
-                stockLen: b.stockLen,
-                residual: b.residual,
-                items: b.items.map(x => Number(x))
-            }));
-        }
-
-        function aggregateBinsToSolution(bins, kerf) {
-            let patternMap = new Map();
-            let totalWaste = 0;
-            let totalUsed = 0;
-
-            bins.forEach(bin => {
-                const counts = {};
-                bin.items.forEach(l => counts[l] = (counts[l] || 0) + 1);
-                const sortedLens = Object.keys(counts).map(Number).sort((a, b) => b - a);
-                const keyStr = `${bin.stockLen}_${sortedLens.map(l => `${l}x${counts[l]}`).join('_')}`;
-                const usedLen = bin.items.reduce((s, v) => s + v, 0) + Math.max(0, bin.items.length - 1) * kerf;
-                const waste = bin.stockLen - usedLen;
-                totalWaste += waste;
-                totalUsed += bin.stockLen;
-
-                if (!patternMap.has(keyStr)) {
-                    patternMap.set(keyStr, {
-                        stockLen: bin.stockLen,
-                        comboStr: sortedLens.map(l => `${l}mm × ${counts[l]}`).join(' + '),
-                        items: sortedLens.map(l => ({ len: parseInt(l), count: counts[l] })),
-                        waste: waste,
-                        freq: 0,
-                        usedLen: usedLen
-                    });
-                }
-                patternMap.get(keyStr).freq += 1;
-            });
-
-            const patterns = Array.from(patternMap.values()).sort((a, b) => b.freq - a.freq);
-            const totalTarget = demands.reduce((sum, d) => sum + d.len * d.dem, 0);
-            const utilization = totalUsed > 0 ? (totalTarget / totalUsed) * 100 : 0;
-
-            return {
-                totalBins: bins.length,
-                totalWaste,
-                totalTarget,
-                totalUsed,
-                utilization,
-                patterns
-            };
-        }
-
-        function placeItemGreedyOnBins(orderCatIds, itemMap, reqCategories, stockSource, kerf) {
-            const stockState = cloneStocks(stockSource).sort((a, b) => a.len - b.len);
-            const bins = [];
-
-            const categoryMap = new Map();
-            reqCategories.forEach(c => categoryMap.set(c.id, c));
-
-            for (const catId of orderCatIds) {
-                const cat = categoryMap.get(catId);
-                for (let t = 0; t < cat.dem; t++) {
-                    const itemLen = cat.len;
-                    let bestBinIdx = -1;
-                    let bestWaste = Infinity;
-
-                    for (let i = 0; i < bins.length; i++) {
-                        const bin = bins[i];
-                        const need = itemLen + kerf;
-                        if (bin.residual >= need) {
-                            const waste = bin.residual - need;
-                            if (waste < bestWaste) {
-                                bestWaste = waste;
-                                bestBinIdx = i;
-                            }
-                        }
-                    }
-
-                    if (bestBinIdx !== -1) {
-                        const bin = bins[bestBinIdx];
-                        bin.items.push(itemLen);
-                        bin.residual -= (itemLen + kerf);
-                    } else {
-                        let bestStockIdx = -1;
-                        let minWaste = Infinity;
-                        for (let i = 0; i < stockState.length; i++) {
-                            if (stockState[i].inv > 0 && stockState[i].len >= itemLen) {
-                                const waste = stockState[i].len - itemLen;
-                                if (waste < minWaste) {
-                                    minWaste = waste;
-                                    bestStockIdx = i;
-                                }
-                            }
-                        }
-                        if (bestStockIdx === -1) return null;
-
-                        const stock = stockState[bestStockIdx];
-                        bins.push({
-                            stockLen: stock.len,
-                            residual: stock.len - itemLen,
-                            items: [itemLen]
-                        });
-                        stock.inv -= 1;
-                    }
-                }
-            }
-
-            return bins;
-        }
-
-        function greedyPermutationDecode(order, reqCategories, stockSource, kerf) {
-            const stockState = cloneStocks(stockSource).sort((a, b) => a.len - b.len);
-            const bins = [];
-            const categoryMap = new Map(reqCategories.map(c => [c.id, c]));
-
-            for (const catId of order) {
-                const cat = categoryMap.get(catId);
-                if (!cat) continue;
-
-                for (let k = 0; k < cat.dem; k++) {
-                    const itemLen = cat.len;
-                    let bestBinIdx = -1;
-                    let minWaste = Infinity;
-
-                    for (let i = 0; i < bins.length; i++) {
-                        const bin = bins[i];
-                        const need = itemLen + kerf;
-                        if (bin.items.length > 0 && bin.residual >= need) {
-                            const waste = bin.residual - need;
-                            if (waste < minWaste) {
-                                minWaste = waste;
-                                bestBinIdx = i;
-                            }
-                        }
-                    }
-
-                    if (bestBinIdx !== -1) {
-                        const bin = bins[bestBinIdx];
-                        bin.items.push(itemLen);
-                        bin.residual -= (itemLen + kerf);
-                        continue;
-                    }
-
-                    let bestStockIdx = -1;
-                    let bestStockWaste = Infinity;
-                    for (let i = 0; i < stockState.length; i++) {
-                        if (stockState[i].inv > 0 && stockState[i].len >= itemLen) {
-                            const waste = stockState[i].len - itemLen;
-                            if (waste < bestStockWaste) {
-                                bestStockWaste = waste;
-                                bestStockIdx = i;
-                            }
-                        }
-                    }
-                    if (bestStockIdx === -1) return null;
-
-                    const stock = stockState[bestStockIdx];
-                    bins.push({
-                        stockLen: stock.len,
-                        residual: stock.len - itemLen,
-                        items: [itemLen]
-                    });
-                    stock.inv -= 1;
-                }
-            }
-
-            return bins;
-        }
-
-        function solveWithGA(stocksData, reqs, kerf) {
-            const categories = reqs.map((r, idx) => ({
-                id: `c${idx}`,
-                len: Number(r.len),
-                dem: Number(r.dem)
-            })).filter(c => c.dem > 0 && c.len > 0);
-
-            if (categories.length === 0) return null;
-
-            const categoryIds = categories.map(c => c.id);
-            const populationSize = Math.max(24, Math.min(60, categories.length * 8));
-            const generations = Math.max(50, Math.min(140, 20 + categories.length * 10));
-            const eliteCount = 2;
-            const crossoverRate = 0.85;
-            const mutationRate = 0.18;
-
-            function shuffle(arr) {
-                const a = arr.slice();
-                for (let i = a.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [a[i], a[j]] = [a[j], a[i]];
-                }
-                return a;
-            }
-
-            function evaluate(order) {
-                const bins = greedyPermutationDecode(order, categories, stocksData, kerf);
-                if (!bins) {
-                    return { score: Number.POSITIVE_INFINITY, ok: false, bins: null, patterns: [] };
-                }
-                const summary = aggregateBinsToSolution(bins, kerf);
-                const score = summary.totalWaste + bins.length * 0.001;
-                return {
-                    score,
-                    ok: true,
-                    bins,
-                    ...summary
-                };
-            }
-
-            function tournament(pop) {
-                const k = 3;
-                let best = null;
-                for (let i = 0; i < k; i++) {
-                    const cand = pop[Math.floor(Math.random() * pop.length)];
-                    if (!best || cand.score < best.score) best = cand;
-                }
-                return best;
-            }
-
-            function orderCrossover(p1, p2) {
-                const n = p1.length;
-                if (n <= 1) return p1.slice();
-                let a = Math.floor(Math.random() * n);
-                let b = Math.floor(Math.random() * n);
-                if (a > b) [a, b] = [b, a];
-
-                const child = Array(n).fill(null);
-                const used = new Set();
-
-                for (let i = a; i <= b; i++) {
-                    child[i] = p1[i];
-                    used.add(p1[i]);
-                }
-                let pos = (b + 1) % n;
-                for (let i = 0; i < n; i++) {
-                    const gene = p2[(b + 1 + i) % n];
-                    if (!used.has(gene)) {
-                        child[pos] = gene;
-                        used.add(gene);
-                        pos = (pos + 1) % n;
-                    }
-                }
-                return child;
-            }
-
-            function mutate(order) {
-                const out = order.slice();
-                if (out.length <= 1) return out;
-                const i = Math.floor(Math.random() * out.length);
-                const j = Math.floor(Math.random() * out.length);
-                [out[i], out[j]] = [out[j], out[i]];
-                if (out.length > 3 && Math.random() < 0.35) {
-                    let a = Math.floor(Math.random() * out.length);
-                    let b = Math.floor(Math.random() * out.length);
-                    if (a > b) [a, b] = [b, a];
-                    const seg = out.slice(a, b + 1).reverse();
-                    out.splice(a, seg.length, ...seg);
-                }
-                return out;
-            }
-
-            let population = [];
-            population.push(categoryIds.slice().sort((a, b) => {
-                const ca = categories.find(x => x.id === a);
-                const cb = categories.find(x => x.id === b);
-                return cb.len - ca.len;
-            }));
-            while (population.length < populationSize) {
-                population.push(shuffle(categoryIds));
-            }
-
-            let evaluated = population.map(order => ({ order, ...evaluate(order) })).sort((a, b) => a.score - b.score);
-            let globalBest = evaluated[0];
-
-            for (let gen = 0; gen < generations; gen++) {
-                evaluated.sort((a, b) => a.score - b.score);
-                if (evaluated[0].score < globalBest.score) globalBest = evaluated[0];
-
-                const nextPop = evaluated.slice(0, eliteCount).map(x => x.order.slice());
-
-                while (nextPop.length < populationSize) {
-                    const parent1 = tournament(evaluated).order;
-                    let child = parent1.slice();
-
-                    if (Math.random() < crossoverRate) {
-                        const parent2 = tournament(evaluated).order;
-                        child = orderCrossover(parent1, parent2);
-                    }
-                    if (Math.random() < mutationRate) {
-                        child = mutate(child);
-                    }
-                    nextPop.push(child);
-                }
-
-                evaluated = nextPop.map(order => ({ order, ...evaluate(order) }));
-            }
-
-            const bestEval = globalBest.ok ? globalBest : evaluated.sort((a, b) => a.score - b.score)[0];
-            if (!bestEval || !bestEval.ok) return null;
-
-            const finalSummary = aggregateBinsToSolution(bestEval.bins, kerf);
-            return {
-                ...finalSummary,
-                algorithmName: '遗传算法',
-                rawOrder: bestEval.order
-            };
-        }
-
-        function solveWithExact(stocksData, reqs, kerf) {
-            const items = expandDemands(reqs).sort((a, b) => b.len - a.len);
-            if (items.length === 0) return null;
-
-            const stockState = cloneStocks(stocksData).sort((a, b) => a.len - b.len);
-            const suffixLen = new Array(items.length + 1).fill(0);
-            for (let i = items.length - 1; i >= 0; i--) suffixLen[i] = suffixLen[i + 1] + items[i].len;
-
-            let bestWaste = Number.POSITIVE_INFINITY;
-            let bestBins = null;
-            const seen = new Map();
-            const timeLimitMs = 8000;
-            const start = performance.now();
-
-            function canonicalKey(idx, bins, stocks) {
-                const residuals = bins.map(b => b.residual).sort((a, b) => a - b).join(',');
-                const invKey = stocks.map(s => `${s.len}:${s.inv}`).join('|');
-                return `${idx}#${invKey}#${residuals}`;
-            }
-
-            function currentWaste(bins) {
-                return bins.reduce((sum, b) => sum + b.residual, 0);
-            }
-
-            function dfs(idx, bins, stocks) {
-                if (performance.now() - start > timeLimitMs) {
-                    throw new Error('EXACT_TIMEOUT');
-                }
-
-                if (idx === items.length) {
-                    const waste = currentWaste(bins);
-                    if (waste < bestWaste) {
-                        bestWaste = waste;
-                        bestBins = cloneBins(bins);
-                    }
-                    return;
-                }
-
-                const cw = currentWaste(bins);
-                const lb = Math.max(0, cw - suffixLen[idx]);
-                if (lb >= bestWaste) return;
-
-                const key = canonicalKey(idx, bins, stocks);
-                const prev = seen.get(key);
-                if (prev !== undefined && prev <= cw) return;
-                seen.set(key, cw);
-
-                const itemLen = items[idx].len;
-                const options = [];
-
-                for (let i = 0; i < bins.length; i++) {
-                    const bin = bins[i];
-                    const need = itemLen + kerf;
-                    if (bin.residual >= need) {
-                        options.push({ type: 'bin', idx: i, score: bin.residual - need });
-                    }
-                }
-
-                for (let s = 0; s < stocks.length; s++) {
-                    if (stocks[s].inv > 0 && stocks[s].len >= itemLen) {
-                        options.push({ type: 'new', idx: s, score: stocks[s].len - itemLen });
-                    }
-                }
-
-                options.sort((a, b) => a.score - b.score);
-
-                for (const opt of options) {
-                    if (opt.type === 'bin') {
-                        const bin = bins[opt.idx];
-                        bin.items.push(itemLen);
-                        bin.residual -= (itemLen + kerf);
-                        dfs(idx + 1, bins, stocks);
-                        bin.residual += (itemLen + kerf);
-                        bin.items.pop();
-                    } else {
-                        const st = stocks[opt.idx];
-                        st.inv -= 1;
-                        bins.push({
-                            stockLen: st.len,
-                            residual: st.len - itemLen,
-                            items: [itemLen]
-                        });
-                        dfs(idx + 1, bins, stocks);
-                        bins.pop();
-                        st.inv += 1;
-                    }
-                }
-            }
-
-            try {
-                dfs(0, [], cloneStocks(stockState));
-            } catch (err) {
-                if (err && err.message === 'EXACT_TIMEOUT') {
-                    showToast('精确算法搜索时间较长，已自动切换为遗传算法结果。', 'warning');
-                    return solveWithGA(stocksData, reqs, kerf);
-                }
-                throw err;
-            }
-
-            if (!bestBins) return null;
-            const summary = aggregateBinsToSolution(bestBins, kerf);
-            return {
-                ...summary,
-                algorithmName: '精确算法'
-            };
-        }
-
-        function highlightChart(idx) {
-            if (myChart) {
-                myChart.dispatchAction({ type: 'highlight', dataIndex: idx });
-                let option = myChart.getOption();
-                let validSeriesIdx = 0;
-                if (option && option.series) {
-                    for (let i = 0; i < option.series.length; i++) {
-                        if (option.series[i].data[idx] !== '-') {
-                            validSeriesIdx = i; break;
-                        }
-                    }
-                }
-                myChart.dispatchAction({ type: 'showTip', seriesIndex: validSeriesIdx, dataIndex: idx });
-
-                try {
-                    let pixelY = myChart.convertToPixel({ yAxisIndex: 0 }, idx);
-                    let scrollContainer = document.getElementById('chartScrollContainer');
-                    if (scrollContainer && typeof pixelY === 'number') {
-                        let targetScroll = pixelY - (scrollContainer.clientHeight / 2);
-                        scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
-                    }
-                } catch (e) { }
-            }
-        }
-
-        function downplayChart(idx) {
-            if (myChart) {
-                myChart.dispatchAction({ type: 'downplay', dataIndex: idx });
-                myChart.dispatchAction({ type: 'hideTip' });
-            }
-        }
-
-        function runOptimization() {
-            if (demands.length === 0 || stocks.length === 0) return showToast("配置信息不完整，请补充数据", "warning");
-
-            let kerfVal = parseInt(document.getElementById('kerf').value);
-            if (isNaN(kerfVal) || kerfVal < 0) kerfVal = 0;
-
-            const algo = selectedAlgorithm;
-            const totalDemandCount = demands.reduce((sum, d) => sum + d.dem, 0);
-
-            if (algo === 'exact' && totalDemandCount > 60) {
-                showToast('当前数据量较大，精确算法可能耗时较长，请优先使用遗传算法。', 'warning');
-            }
-
-            const workingStocks = cloneStocks(stocks);
-            let solution = null;
-
-            if (algo === 'exact') {
-                solution = solveWithExact(workingStocks, demands, kerfVal);
-            } else {
-                solution = solveWithGA(workingStocks, demands, kerfVal);
-            }
-
-            if (!solution) return showToast("库存不足或无法满足长料需求，排产失败", "error");
-
-            currentSolution = solution;
-
-            document.getElementById('emptyState').style.display = 'none';
-            const panel = document.getElementById('resultPanel');
-            panel.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                panel.style.transition = 'opacity 0.6s ease';
-                panel.style.opacity = '1';
-            });
-
-            document.getElementById('resUsed').innerText = currentSolution.totalBins;
-            document.getElementById('resWaste').innerText = currentSolution.totalWaste;
-            document.getElementById('resRate').innerText = currentSolution.utilization.toFixed(2);
-
-            let listHtml = '';
-            currentSolution.patterns.forEach((p, idx) => {
-                let utilRate = ((p.usedLen / p.stockLen) * 100).toFixed(1);
-                let barColor = utilRate > 95 ? 'bg-[#34C759]' : (utilRate > 85 ? 'bg-[#007AFF]' : 'bg-[#FF9500]');
-
-                let tagsHtml = p.items.map(item =>
-                    `<span class="inline-block bg-[#F2F2F7] text-[#1D1D1F] px-2.5 py-1 rounded-[6px] text-[13px] font-medium border border-[rgba(0,0,0,0.03)] mr-1.5 mb-1.5">
-                        ${item.len} <span class="text-[#86868B] mx-0.5">×</span> ${item.count}
-                    </span>`
-                ).join('');
-
-                listHtml += `
-                    <div id="list-card-${idx}" class="relative bg-white p-5 rounded-[20px] border border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
-                         onmouseenter="highlightChart(${idx})" onmouseleave="downplayChart(${idx})">
-
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="flex items-center gap-2.5">
-                                <span class="bg-[#1D1D1F] text-white text-[12px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">P${idx + 1}</span>
-                                <span class="text-[#007AFF] text-[14px] font-semibold bg-[#E5F1FF] px-2.5 py-1 rounded-md">${p.stockLen} mm</span>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-[22px] font-bold text-[#1D1D1F] leading-none">${p.freq} <span class="text-[13px] text-[#86868B] font-normal">次</span></div>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            ${tagsHtml}
-                        </div>
-
-                        <div class="flex items-center gap-3">
-                            <div class="flex-grow bg-[#F2F2F7] h-2 rounded-full overflow-hidden">
-                                <div class="${barColor} h-full rounded-full transition-all duration-1000" style="width: ${utilRate}%"></div>
-                            </div>
-                            <span class="text-[13px] font-semibold text-[#86868B] min-w-[40px] text-right">${utilRate}%</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            document.getElementById('aiAnalysis').innerHTML = listHtml;
-            setTimeout(() => { renderDynamicChart(); }, 100);
-            showToast(`${getAlgoLabel()} 计算完成`, 'info');
-        }
-
-        function renderDynamicChart() {
-            let pats = currentSolution.patterns;
-            let uniqueLens = [...new Set(pats.flatMap(p => p.items.map(i => i.len)))].sort((a, b) => b - a);
-
-            const palette = ['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#5856D6', '#5AC8FA'];
-            let colorMap = {};
-            uniqueLens.forEach((l, i) => colorMap[l] = palette[i % palette.length]);
-
-            let chartDom = document.getElementById('ganttChart');
-            let legendDom = document.getElementById('ganttLegend');
-
-            let dynamicHeight = Math.max(600, pats.length * 75);
-            chartDom.style.height = dynamicHeight + 'px';
-
-            if (myChart) { myChart.dispose(); }
-            if (legendChart) { legendChart.dispose(); }
-
-            myChart = echarts.init(chartDom);
-            legendChart = echarts.init(legendDom);
-
-            let seriesData = [];
-
-            uniqueLens.forEach(len => {
-                let dataArray = [];
-                pats.forEach(p => {
-                    let item = p.items.find(i => i.len === len);
-                    dataArray.push(item ? item.len * item.count : '-');
-                });
-                seriesData.push({
-                    name: `定尺:${len}`,
-                    type: 'bar',
-                    stack: 'total',
-                    barWidth: 32,
-                    itemStyle: { color: colorMap[len], borderRadius: [2, 2, 2, 2], borderColor: '#fff', borderWidth: 1.5 },
-                    data: dataArray
-                });
-            });
-
-            seriesData.push({
-                name: '切缝与废料',
-                type: 'bar',
-                stack: 'total',
-                barWidth: 32,
-                itemStyle: { color: '#E5E5EA', borderRadius: [0, 8, 8, 0] },
-                data: pats.map(p => p.waste === 0 ? '-' : p.waste)
-            });
-
-            let maxStockUsed = Math.max(...pats.map(p => p.stockLen));
-
-            const option = {
-                backgroundColor: 'transparent',
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(0,122,255,0.04)' } },
-                    backgroundColor: 'rgba(255,255,255,0.95)',
-                    backdropFilter: 'blur(20px)',
-                    borderColor: 'rgba(0,0,0,0.05)',
-                    padding: 16,
-                    textStyle: { color: '#1D1D1F' },
-                    extraCssText: 'box-shadow: 0 10px 40px rgba(0,0,0,0.12); border-radius: 16px;',
-                    formatter: function (params) {
-                        let pat = pats[params[0].dataIndex];
-                        return `
-                            <div class="font-sans">
-                                <div class="text-[13px] text-[#86868B] mb-1.5 font-medium">切割模式 ${params[0].dataIndex + 1}</div>
-                                <div class="font-bold text-[15px] mb-2.5 text-[#1D1D1F]">原材: ${pat.stockLen}mm</div>
-                                <div class="text-[14px] text-[#515154] mb-3 leading-relaxed max-w-[200px] whitespace-normal">配方: ${pat.comboStr}</div>
-                                <div class="font-semibold text-[14px] bg-[#F2F2F7] px-3 py-1.5 rounded-lg inline-block">执行频次: <span class="text-[#007AFF] ml-1">${pat.freq} 次</span></div>
-                            </div>
-                        `;
-                    }
-                },
-                legend: { show: false },
-                grid: { left: '3%', right: '5%', bottom: '20px', top: '20px', containLabel: true },
-                xAxis: {
-                    type: 'value',
-                    max: maxStockUsed,
-                    splitLine: { lineStyle: { color: '#F2F2F7', type: 'dashed' } },
-                    axisLabel: { color: '#86868B', fontFamily: '-apple-system', fontSize: 12 },
-                    axisLine: { show: false }
-                },
-                yAxis: {
-                    type: 'category',
-                    inverse: true,
-                    data: pats.map((p, i) => `P${i + 1}`),
-                    axisLine: { show: false },
-                    axisTick: { show: false },
-                    axisLabel: { fontWeight: '600', fontSize: 14, color: '#1D1D1F', fontFamily: '-apple-system', margin: 16 }
-                },
-                series: seriesData
-            };
-            myChart.setOption(option, true);
-            myChart.resize();
-
-            const legendOption = {
-                legend: {
-                    data: uniqueLens.map(l => `定尺:${l}`).concat(['切缝与废料']),
-                    icon: 'circle',
-                    itemWidth: 12,
-                    textStyle: { color: '#86868B', fontFamily: '-apple-system', fontSize: 13 },
-                    type: 'scroll',
-                    pageIconColor: '#007AFF',
-                    top: 'center'
-                },
-                xAxis: { show: false, type: 'category' },
-                yAxis: { show: false, type: 'value' },
-                series: seriesData.map(s => ({
-                    name: s.name,
-                    type: 'bar',
-                    itemStyle: s.itemStyle,
-                    data: []
-                }))
-            };
-            legendChart.setOption(legendOption, true);
-            legendChart.resize();
-
-            legendChart.on('legendselectchanged', function (params) {
-                myChart.dispatchAction({ type: 'legendToggleSelect', name: params.name });
-            });
-            legendChart.on('highlight', function (params) {
-                myChart.dispatchAction({ type: 'highlight', seriesName: params.seriesName });
-            });
-            legendChart.on('downplay', function (params) {
-                myChart.dispatchAction({ type: 'downplay', seriesName: params.seriesName });
-            });
-
-            myChart.on('mouseover', function (params) {
-                let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
-                if (targetCard) {
-                    targetCard.classList.add('list-card-active');
-                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
-            myChart.on('mouseout', function (params) {
-                let targetCard = document.getElementById(`list-card-${params.dataIndex}`);
-                if (targetCard) {
-                    targetCard.classList.remove('list-card-active');
-                }
-            });
-
-            window.addEventListener('resize', () => {
-                if (myChart) myChart.resize();
-                if (legendChart) legendChart.resize();
-            });
-        }
-    </script>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Return & Tax Refund -->
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-badge d1" style="background: linear-gradient(135deg, #FFB347, #FF8C69);">返程</div>
+      <div>
+        <div class="day-title">8月30日 周日 · 机场 + 退税</div>
+        <div class="day-route">6001路机场大巴 → 退税核验 → 值机 → 安检 → 领退税金</div>
+      </div>
+    </div>
+
+    <div class="highlight-block">
+      <h3>✈️ 返程交通：6001路机场大巴</h3>
+      <div class="hl-sub">航班 08:35 起飞 · 国际航班值机柜台通常起飞前60分钟关闭 · 建议至少提前3小时抵达机场</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+        <div style="background:rgba(255,255,255,0.6); border-radius:10px; padding:12px;">
+          <div style="font-size:12px;color:var(--text-light);">乘车点</div>
+          <div style="font-size:14px;font-weight:600;">东大门历史文化公园站</div>
+          <div style="font-size:11px;color:var(--text-light);">离酒店、汗蒸幕均步行5分钟内</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.6); border-radius:10px; padding:12px;">
+          <div style="font-size:12px;color:var(--text-light);">票价</div>
+          <div style="font-size:14px;font-weight:600;">17,000 韩元/人</div>
+          <div style="font-size:11px;color:var(--text-light);">可刷 T-money 或现场购票</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="timeline" id="returnDay">
+      <div class="timeline-item sky">
+        <div class="card" data-id="ret-1">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">04:00</div>
+            <div class="card-title">从汗蒸幕收拾行李出发</div>
+            <div class="card-desc">步行到大巴站点等候。</div>
+            <div class="card-tags"><span class="tag sky">出发</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item lavender">
+        <div class="card" data-id="ret-2">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">04:35</div>
+            <div class="card-title">搭乘首班 6001 路机场大巴</div>
+            <div class="card-desc">首班车04:30从东大门始发站发车，到该站点约04:35。凌晨无堵车，车程约70分钟到T1，到T2再加10分钟。</div>
+            <div class="card-tags"><span class="tag lavender">大巴</span><span class="tag mint">首班车</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-item pink">
+        <div class="card" data-id="ret-3">
+          <div class="checkbox"></div>
+          <div class="card-body">
+            <div class="card-time">05:45</div>
+            <div class="card-title">抵达仁川机场 T1 航站楼出发层</div>
+            <div class="card-tags"><span class="tag pink">到达机场</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tax refund steps -->
+    <div class="highlight-block" style="margin-top: 20px; background: linear-gradient(135deg, var(--yellow), var(--peach));">
+      <h3>💰 退税 + 值机流程（顺序不能错）</h3>
+      <div class="hl-sub" style="color:#8B6914;">以 T1 航站楼为例</div>
+
+      <div class="tax-step">
+        <div class="step-time">05:45 — 06:10</div>
+        <div class="step-title">① 海关退税核验</div>
+        <div class="step-desc">去3楼出发厅 J区/D区 的退税自助机，刷护照 + 扫描所有退税单条形码，普通商品显示"⭕"即完成核验；若单笔退税超7.5万韩元显示"❌"，去旁边海关柜台人工查验盖章。</div>
+        <div class="warn">⚠️ 退税商品此时不要托运，放在便于取出的位置</div>
+      </div>
+
+      <div class="tax-step">
+        <div class="step-time">06:10 — 06:40</div>
+        <div class="step-title">② 办理值机 + 托运行李</div>
+        <div class="step-desc">到对应航空公司柜台办理值机，托运行李。奢侈品等需随身的退税商品不要托运。</div>
+      </div>
+
+      <div class="tax-step">
+        <div class="step-time">06:40 — 07:10</div>
+        <div class="step-title">③ 安检 + 边检</div>
+        <div class="step-desc">早班机人流少，通关速度快，全程约20-30分钟。</div>
+      </div>
+
+      <div class="tax-step">
+        <div class="step-time">07:10 — 07:30</div>
+        <div class="step-title">④ 领取退税金</div>
+        <div class="step-desc">过安检后前往 28号登机口附近 的退税柜台，凭护照和核验后的退税单领取退税款，推荐选韩元现金，可直接在机场便利店消费。</div>
+      </div>
+
+      <div class="tax-step">
+        <div class="step-time">07:30 后</div>
+        <div class="step-title">⑤ 前往登机口休息等候</div>
+        <div class="step-desc">时间充裕还能顺路逛免税店。08:05 开始登机，08:35 航班起飞。</div>
+      </div>
+    </div>
+
+    <!-- Backup -->
+    <div class="backup-block">
+      <h3>🚕 兜底备选：深夜打车直达</h3>
+      <p>如果担心大巴班次不稳，可选择凌晨04:00从东大门打车直达机场，车程约60分钟，费用约8-10万韩元/车，可坐4人均摊，时间完全可控，绝对不会误机。</p>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="notes-block">
+    <h3>📝 补充注意事项</h3>
+    <ul class="notes-list">
+      <li>AREX 直达列车首尔站支持部分航空公司提前值机，若航司在列，可在首尔站先办值机托运，到机场直接过安检退税，能省一点时间，但航司覆盖有限，建议提前查询。</li>
+      <li>市区 Olive Young 等店铺支持即时退税，结账时出示护照直接扣税，不用再到机场办理，能节省机场时间。</li>
+      <li>通宵期间看好随身贵重物品，大件行李寄存在汗蒸幕或酒店前台，不要随身携带奔波。</li>
+      <li>注意区分 AREX 直达列车（橙色）和普通列车（蓝色），普通列车停站多、耗时久。</li>
+      <li>退税商品在核验完成前不要托运，奢侈品等需随身的退税商品全程不要托运。</li>
+    </ul>
+  </div>
+
+  <div class="footer">祝旅途愉快 ✨</div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'seoul_trip_checks';
+  const cards = document.querySelectorAll('.card[data-id]');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+
+  // Load saved state
+  let checks = {};
+  try {
+    checks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch(e) { checks = {}; }
+
+  function updateProgress() {
+    const total = cards.length;
+    const done = document.querySelectorAll('.card.done').length;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    progressFill.style.width = pct + '%';
+    progressText.textContent = done + ' / ' + total + ' 已完成';
+  }
+
+  cards.forEach(card => {
+    const id = card.dataset.id;
+    if (checks[id]) card.classList.add('done');
+    card.addEventListener('click', () => {
+      card.classList.toggle('done');
+      checks[id] = card.classList.contains('done');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(checks));
+      updateProgress();
+    });
+  });
+
+  updateProgress();
+</script>
 
 </body>
 </html>
